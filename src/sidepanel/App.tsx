@@ -42,6 +42,10 @@ export function App() {
     openExtensionPage('accounts.html');
   };
 
+  const openStories = () => {
+    openExtensionPage('stories.html');
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-bg">
       <SidepanelHeader
@@ -146,6 +150,10 @@ export function App() {
       <footer className="flex items-center justify-center gap-3 border-t border-border bg-surface px-3 py-2 text-[10px] text-muted">
         <button type="button" onClick={openHistory} className="hover:text-fg">
           History
+        </button>
+        <span aria-hidden="true">·</span>
+        <button type="button" onClick={openStories} className="hover:text-fg">
+          Stories
         </button>
         <span aria-hidden="true">·</span>
         <button type="button" onClick={openAccounts} className="hover:text-fg">

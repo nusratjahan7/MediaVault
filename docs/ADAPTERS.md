@@ -102,6 +102,20 @@ Missing values stay `undefined`; no placeholder account, date, or media URL is f
 - Profile cards are parsed from visible anchors/posters: direct videos when embedded, otherwise link-only entries with a clear reason plus downloadable thumbnails.
 - Private/login states and blob-only playback produce blocking/unsupported limitations; signed URLs are never rewritten.
 
+### Stories and highlights
+
+Adapters optionally implement:
+
+```ts
+discoverStories(context, discovery): StoryMedia[]
+discoverHighlights(context, discovery): HighlightMedia[]
+```
+
+- Instagram/Facebook story pages produce `StoryMedia` items with 24-hour expiration when a timestamp is exposed; page text indicating expiry adds a `story-expired` limitation. Instagram profile story rings are surfaced as unavailable open-to-load entries. Highlight pages produce `HighlightMedia` with title, cover, and collection-tagged media. Profile highlight trays expose title/cover and require opening the highlight for media.
+- TikTok stories are supported from public page data; TikTok highlights are explicitly unsupported.
+- Highlight media/covers carry `collectionType: 'highlight'` and `collectionTitle`, so downloads land under `MediaVault/<platform>/highlights/<title>/`.
+- No anonymous story viewing, view concealment, or private-account bypass is provided.
+
 ## Download options
 
 `getDownloadOptions(item)` returns only formats with a direct, permitted `http(s)` URL.

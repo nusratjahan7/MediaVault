@@ -100,6 +100,15 @@ The popup also offers **Copy caption & source URL** for Instagram, Facebook, and
 - Failed/cancelled rows expose Retry.
 - A failure count badge and per-item error text summarize problems; the download bar shows overall saved/failed/total progress.
 
+## Stories & highlights page
+
+- Opened from the popup on a story/highlight/profile page or the Stories navigation item.
+- Shows account-grouped stories with expiration info and **Save story** / **Save all from account**.
+- Shows highlight cards with title, cover, media count, **Save highlight**, **Save cover**, and **Open**.
+- Highlights organize downloads under `MediaVault/<platform>/highlights/<Title>/`.
+- Expired/deleted/restricted media is disabled with an explicit reason.
+- A persistent notice states that anonymous story viewing and view concealment are unavailable.
+
 ## Live download feedback
 
 - Queue rows show Chrome-reported percentage progress and byte counts; no percentage is invented. If Chrome has no total size, the row uses an indeterminate bar.

@@ -5,4 +5,5 @@ export * from './messages';
 export * from './page';
 export * from './platform';
 export * from './settings';
+export * from './story';
 export * from './ui';

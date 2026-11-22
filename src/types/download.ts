@@ -28,6 +28,8 @@ export interface DownloadSource {
   filenameHint?: string;
   formats?: MediaFormat[];
   downloadStatus?: MediaDownloadStatus;
+  collectionType?: 'story' | 'highlight' | 'album';
+  collectionTitle?: string;
 }
 
 export interface DownloadRecord {

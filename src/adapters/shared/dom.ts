@@ -177,6 +177,13 @@ export function detectLoginWall(document: Document): boolean {
   );
 }
 
+export function detectExpiredStory(document: Document): boolean {
+  const text = (document.body?.textContent ?? '').toLowerCase();
+  return /story (?:is )?(?:no longer available|unavailable|expired)|this story has expired|highlight (?:is )?no longer available/.test(
+    text,
+  );
+}
+
 export function detectPrivateContent(document: Document): boolean {
   const text = (document.body?.textContent ?? '').toLowerCase();
   return /this account is private|this post is not available|this content isn't available|sorry, this page isn't available|content isn't available right now/.test(

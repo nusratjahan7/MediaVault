@@ -114,6 +114,8 @@ export function downloadSourceFromMediaItem(item: MediaItem): DownloadSource {
     filenameHint: item.filenameHint,
     formats: item.formats,
     downloadStatus: item.downloadStatus,
+    collectionType: item.collectionType,
+    collectionTitle: item.collectionTitle,
   };
 }
 
@@ -133,6 +135,8 @@ function sourceToMediaItem(source: DownloadSource): MediaItem {
     filenameHint: source.filenameHint,
     formats: source.formats,
     downloadStatus: source.downloadStatus,
+    collectionType: source.collectionType,
+    collectionTitle: source.collectionTitle,
     downloadable: source.downloadStatus
       ? source.downloadStatus === 'available'
       : true,

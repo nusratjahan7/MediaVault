@@ -13,7 +13,10 @@ export function scanPage(document: Document, url: URL): ScanResult {
     );
   }
 
-  const discovery = adapter.discoverMedia({ document, url });
+  const context = { document, url };
+  const discovery = adapter.discoverMedia(context);
+  const stories = adapter.discoverStories?.(context, discovery) ?? [];
+  const highlights = adapter.discoverHighlights?.(context, discovery) ?? [];
   const deduped = dedupeMediaItems(discovery.items).slice(0, MAX_SCAN_ITEMS);
 
   return {
@@ -24,5 +27,7 @@ export function scanPage(document: Document, url: URL): ScanResult {
     limitations: discovery.limitations,
     pageType: discovery.pageType,
     account: discovery.account,
+    stories,
+    highlights,
   };
 }

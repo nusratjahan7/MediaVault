@@ -2,7 +2,7 @@ import type { DownloadOption, MediaItem, ScanLimitation } from '@/types/media';
 import type { AccountIdentity, PageType, PlatformDetection } from '@/types/page';
 import type { PlatformId } from '@/types/platform';
 import { isHttpUrl } from '@/utils/url';
-import { dedupeMediaItems } from './shared/dom';
+import { dedupeMediaItems, detectExpiredStory } from './shared/dom';
 import { buildDownloadOptions, enrichMediaItem } from './shared/metadata';
 import type {
   AdapterDiscovery,
@@ -45,6 +45,19 @@ export abstract class BasePlatformAdapter implements PlatformAdapter {
       raw = this.discoverRawMedia(context);
     } catch {
       raw = { items: [], limitations: [EXTRACTION_FAILED] };
+    }
+
+    if (
+      (pageType === 'story' || pageType === 'highlight') &&
+      detectExpiredStory(context.document) &&
+      !raw.limitations.some((limitation) => limitation.code === 'story-expired')
+    ) {
+      raw.limitations.push({
+        code: 'story-expired',
+        severity: 'warning',
+        message:
+          'This story or highlight is no longer available or has expired. MediaVault cannot recover expired or deleted media.',
+      });
     }
 
     const blocking = raw.limitations.some(

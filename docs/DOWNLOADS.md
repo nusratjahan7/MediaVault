@@ -77,6 +77,7 @@ The check uses completed local history only. Disabling the setting, deleting the
 
 ## History and reconciliation
 
+- Highlight media and covers carry `collectionType: 'highlight'`/`collectionTitle`, producing `MediaVault/<platform>/highlights/<title>/...` paths.
 - Every job writes the existing `HistoryEntry` shape with status, bytes, total bytes, paused flag, download id, and error.
 - On service-worker startup, active rows are reconciled against `chrome.downloads.search`; in-progress downloads are reattached to polling, completed rows are finalized, and missing/interrupted downloads become failed with a clear message.
 - `getHistory()` merges in-memory session records with persisted IndexedDB history.

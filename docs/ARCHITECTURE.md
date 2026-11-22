@@ -18,6 +18,8 @@ Module 7 (TikTok Media Downloader) is complete: current videos, thumbnail assets
 
 Module 8 (Bulk Download & Start Select) is complete: per-tab session-persisted selection, checkbox selection mode, select-all/clear/remove, configurable 1–3 concurrency, per-item queue pause/resume/cancel/retry, failure summaries, and per-platform folder preservation.
 
+Module 10 (Stories & Highlights Manager) is complete: `StoryMedia`/`HighlightMedia` models, per-adapter story/highlight discovery, expiration info, story/highlight saves, highlight covers, title-based folders, and explicit anonymity/authorization limits.
+
 ## 2. Runtime topology
 
 ```
@@ -71,8 +73,9 @@ Module 8 (Bulk Download & Start Select) is complete: per-tab session-persisted s
 | `src/content/` | Injected scanner lifecycle, SPA invalidation, scan response, isolated in-page download overlay |
 | `src/popup/` | Page/account context, permission gate, actions, selection mode, queue preview, scan results |
 | `src/options/` | Settings sections, UI preview mode, local data controls |
-| `src/sidepanel/` | Library and Queue views with history/account/settings links |
+| `src/sidepanel/` | Library and Queue views with history/stories/account/settings links |
 | `src/history/` | Full history page with stats, filters, pagination, and actions |
+| `src/stories/` | Stories & highlights manager page |
 | `src/accounts/` | Account-selection preview page |
 | `src/components/` | UI primitives, layout shell, media/history/queue/context/account/settings components, providers |
 | `src/hooks/` | Reusable state and chrome-API orchestration, plus preview queue/account/history hooks |
@@ -94,6 +97,7 @@ Module 8 (Bulk Download & Start Select) is complete: per-tab session-persisted s
 | `types/platform.ts` | `PlatformId`, `PlatformMeta`, `SiteStatus` |
 | `types/page.ts` | `PageType`, `PlatformDetection`, `AccountIdentity` |
 | `types/media.ts` | `MediaItem`, `MediaKind`, `MediaFormat`, `DownloadOption`, `MediaDownloadStatus`, `ScanResult` |
+| `types/story.ts` | `StoryMedia`, `HighlightMedia` |
 | `types/download.ts` | `DownloadJobSummary`, `EnqueueResult` |
 | `types/settings.ts` | `Settings`, `ThemePreference` |
 | `types/history.ts` | `HistoryEntry`, `DownloadStatus`, `HistoryQuery`, `HistoryPage` |
@@ -118,6 +122,8 @@ detectPageType(ctx)             // profile/feed/post/reel/video/story/highlight/
 identifyAccount(ctx)            // visible account identity or null
 discoverMedia(ctx)              // AdapterDiscovery { platform, pageType, account, items, limitations }
 extractMetadata(ctx)            // MediaItem[]
+discoverStories?(ctx, discovery)    // StoryMedia[]
+discoverHighlights?(ctx, discovery) // HighlightMedia[]
 getDownloadOptions(item)        // DownloadOption[]
 ```
 
@@ -221,10 +227,10 @@ Design rules enforced by the manifest and build verifier:
 
 Two plain Vite builds produce one loadable folder:
 
-1. **Page build** (`vite.config.ts`) — `popup.html`, `options.html`, `sidepanel.html`, `history.html`, `accounts.html`, and `src/background/index.ts` as an ESM service worker with a fixed `background.js` name. HTML/asset chunks are hashed under `assets/`.
+1. **Page build** (`vite.config.ts`) — `popup.html`, `options.html`, `sidepanel.html`, `history.html`, `accounts.html`, `stories.html`, and `src/background/index.ts` as an ESM service worker with a fixed `background.js` name. HTML/asset chunks are hashed under `assets/`.
 2. **Content build** (`vite.content.config.ts`) — `src/content/index.ts` bundled to a single IIFE at the fixed path `content.js`. A fixed path is required for `chrome.scripting.registerContentScripts`; this is why a generic extension plugin is not used.
 
-`public/manifest.json` and `public/icons/*` are copied verbatim; the five HTML entry pages are emitted with hashed asset references by Vite.
+`public/manifest.json` and `public/icons/*` are copied verbatim; the six HTML entry pages are emitted with hashed asset references by Vite.
 
 **Scripts**
 
@@ -320,8 +326,8 @@ npm run build
 
 - Strict TypeScript across `src/` and build configs.
 - ESLint 9 with React hooks rules.
-- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, Instagram profile pictures/grid/story discovery, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile-card links and bulk selection, per-tab selection persistence and concurrency limits, in-page action placement and click handling, caption export, Skip Downloaded, download service states/progress/pause/cancel/retry/Save As/duplicates, queue controls and failure summary, storage, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
-- `verify-dist.mjs` checks the built package as Chrome would consume it, including all five HTML surfaces.
+- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, story/highlight models, expiration and title folders, the stories manager page, Instagram profile pictures/grid/story discovery, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile-card links and bulk selection, per-tab selection persistence and concurrency limits, in-page action placement and click handling, caption export, Skip Downloaded, download service states/progress/pause/cancel/retry/Save As/duplicates, queue controls and failure summary, storage, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
+- `verify-dist.mjs` checks the built package as Chrome would consume it, including all six HTML surfaces.
 
 Live Chrome E2E against real social pages has **not** been run in this environment. The manual QA matrix is in the README.
 
@@ -335,6 +341,7 @@ Live Chrome E2E against real social pages has **not** been run in this environme
 - In-page buttons read only media already visible on the authorized page; login/private pages receive no buttons.
 - Caption export copies text locally to the clipboard; nothing is uploaded.
 - Bulk selections live in `chrome.storage.session` per tab, are never synced, and clear when the browser session ends.
+- Stories/highlights are read only from content already visible in the authorized session; MediaVault does not provide anonymous viewing or conceal view activity.
 - TikTok discovery uses public embedded page data only; no signed internal API or anti-bot token is used.
 - Demo thumbnails are local SVG data URIs and demo actions never call Chrome Downloads.
 - Private/restricted content is reported as a limitation, never bypassed.

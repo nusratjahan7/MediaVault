@@ -3,9 +3,14 @@ import type { AccountIdentity, PageType } from '@/types/page';
 import { matchesAnyHost } from '@/utils/url';
 import { BasePlatformAdapter } from '../base-adapter';
 import type { ExtractContext, ExtractResult } from '../types';
+import type { HighlightMedia, StoryMedia } from '@/types/story';
 import { identifyInstagramAccount } from './account';
 import { extractInstagram } from './extract';
 import { detectInstagramPageType } from './page-type';
+import {
+  discoverInstagramHighlights,
+  discoverInstagramStories,
+} from './stories';
 
 export class InstagramAdapter extends BasePlatformAdapter {
   readonly id = 'instagram' as const;
@@ -21,6 +26,28 @@ export class InstagramAdapter extends BasePlatformAdapter {
 
   identifyAccount({ document }: ExtractContext): AccountIdentity | null {
     return identifyInstagramAccount(document);
+  }
+
+  discoverStories(
+    context: ExtractContext,
+    discovery: ExtractResult & {
+      platform: 'instagram';
+      pageType: PageType;
+      account: AccountIdentity | null;
+    },
+  ): StoryMedia[] {
+    return discoverInstagramStories(context, discovery);
+  }
+
+  discoverHighlights(
+    context: ExtractContext,
+    discovery: ExtractResult & {
+      platform: 'instagram';
+      pageType: PageType;
+      account: AccountIdentity | null;
+    },
+  ): HighlightMedia[] {
+    return discoverInstagramHighlights(context, discovery);
   }
 
   protected discoverRawMedia(context: ExtractContext): ExtractResult {

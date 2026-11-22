@@ -4,4 +4,5 @@
 - Never bypass platform access controls (login walls, private accounts, authentication, download restrictions, anti-bot/security systems): surface the restriction gracefully instead of attempting workarounds. Confidence: 0.8
 - Wants bounded resource usage: never fire unlimited concurrent requests; cap concurrency and respect browser resource and platform rate limits. Confidence: 0.6
 - Wants honest capability reporting: only present something as available/downloadable when it genuinely is, and explicitly report unavailable cases (with a clear user-facing message) instead of assuming or fabricating support. Confidence: 0.7
+- When a capability (e.g. anonymous viewing or hiding activity) can't be done through a permitted method, mark it explicitly unavailable rather than building a workaround; never promise anonymity or concealment the tool doesn't provide. Confidence: 0.65
 - Wants platform-specific logic isolated per platform (its own adapter module) and kept separate from other platforms and shared/generic code. Confidence: 0.6

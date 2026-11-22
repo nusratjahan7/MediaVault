@@ -9,10 +9,11 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 - [Architecture](./docs/ARCHITECTURE.md) — module boundaries, messaging, errors, storage, permissions, build pipeline
 - [Platform adapters](./docs/ADAPTERS.md) — detection, account identity, metadata, formats, resilience
 - [Download engine](./docs/DOWNLOADS.md) — service API, states, progress, cancellation, retry, folder choice
-- [Instagram module](./docs/INSTAGRAM.md) — page/media support, in-page buttons, profile grids, stories, Skip Downloaded
+- [Instagram adapter](./docs/ADAPTERS.md#instagram-specifics) — page/media support, in-page buttons, profile grids, stories, Skip Downloaded
 - [Facebook module](./docs/FACEBOOK.md) — albums, reels, direct-video safeguards, metadata, URL formats
 - [TikTok module](./docs/TIKTOK.md) — videos, thumbnails, slideshows, profile discovery, bulk selection
 - [Bulk selection & queue](./docs/BULK.md) — selection persistence, concurrency, queue controls
+- [Stories & highlights](./docs/STORIES.md) — models, discovery, expiration, covers, privacy boundaries
 - [UI guide](./docs/UI.md) — design system, surfaces, components, demo mode and the mock boundary
 - [Privacy policy](./PRIVACY.md)
 - [Module status](#module-status)
@@ -27,6 +28,7 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 - **Module 6 — Facebook Media Downloader:** complete. Photos, direct videos, rendered album media, reels, profile/page discovery, Facebook-specific metadata/URL formats, caption export, and explicit unsupported-video handling.
 - **Module 7 — TikTok Media Downloader:** complete. Current videos, thumbnails, slideshows, multi-video profile discovery, profile-card link handling, caption export, and bulk selection through the shared engine.
 - **Module 8 — Bulk Download & Start Select:** complete. Session-persisted per-tab selection, checkbox overlays, select-all/clear/remove, configurable 1–3 concurrency, per-item queue controls, retry, failure summaries, and platform-folder preservation.
+- **Module 10 — Stories & Highlights Manager:** complete. StoryMedia/HighlightMedia models, per-adapter story/highlight discovery, expiration information, per-story/account saves, highlight titles, cover downloads, and explicit privacy/anonymity limitations.
 
 All downloads use Chrome's Downloads API directly. No media is uploaded, proxied, or fetched through an external server.
 
@@ -42,6 +44,8 @@ All downloads use Chrome's Downloads API directly. No media is uploaded, proxied
 - Shows page/account context, current/bulk download actions, a select mode, and a live queue preview.
 - Keeps multi-item selections per browser tab, including across filters and popup reopen.
 - Runs 1–3 configurable parallel downloads with pause/resume/cancel/retry and failure summaries.
+- Discovers visible stories and highlights, shows expiration when known, saves individual stories or all from an account, and saves highlight media/covers.
+- Organizes highlight downloads by their title under each platform folder.
 - Adds Instagram download buttons beside post actions and on accessible profile-grid items.
 - Saves profile pictures, carousel slides, reels, and directly accessible story/highlight media where permitted.
 - Discovers Facebook photos, direct videos, albums, reels, and visible profile/page media.
@@ -126,6 +130,8 @@ Enable **Settings → Downloads → Skip Downloaded** to block media already com
 
 Use **Start select** for checkbox selection, **Select all**, individual toggles, **Clear selection**, and **Download N**. Selection persists per browser tab in `chrome.storage.session`. Settings → Downloads → **Parallel downloads** caps concurrency at 1–3. Queue rows expose pause/resume/cancel/retry where supported and show per-item status plus a failure-count summary.
 
+On a story, highlight, or profile page, use **Stories & highlights** in the popup (or the Stories navigation item). The manager shows accessible stories with expiration hints, per-account **Save all**, highlight media, and cover downloads. Highlights are saved under `MediaVault/<platform>/highlights/<Title>/`. Anonymous story viewing is not supported; MediaVault does not conceal viewing activity or bypass private-account controls.
+
 Site access is stored per platform. Revoke it in Settings → Site access.
 
 ### Interface preview (mock data)
@@ -149,6 +155,7 @@ src/
   options/           Appearance, downloads, site access, UI preview, privacy/data
   sidepanel/         Library and Queue tabs
   history/           Full download history page
+  stories/           Stories & highlights manager page
   accounts/          Account selection preview page
   components/        UI primitives, layout, media, queue, accounts, history, providers
   hooks/             Settings, theme, tab, access, scan, selection, downloads, history, queue
@@ -258,12 +265,16 @@ Known limits (also shown in-product):
 18. Bulk selection persists per browser tab for the current browser session; selected URLs can expire before download.
 19. Concurrency is capped at three parallel downloads to respect browser and platform limits.
 20. Queue pause/resume depends on Chrome supporting it for that download.
-21. Profile/feed crawling is intentionally absent.
-22. Page type/account/date detection depends on what the platform exposes; unavailable fields remain empty.
-23. Stories, highlights, tagged posts, saved collections, albums, and profile feeds are scanned only when the content is already visible/accessible.
-24. Chrome 116+ desktop only.
-25. Platform DOM changes can break extraction and in-page button placement until adapters are updated.
-26. Chrome Web Store review may scrutinize social downloader extensions; use is limited to content you are authorized to save.
+21. Stories/highlights are only discovered when already visible in the current authorized session; anonymous viewing and view concealment are not supported.
+22. Story expiration is shown only when a timestamp is available; otherwise it is marked unknown.
+23. Profile story rings are surfaced as open-to-load entries; profile highlight trays expose title/cover and require opening the highlight to load media. TikTok highlights are unavailable through permitted public data.
+24. Highlight titles are best-effort; folders use the detected title.
+25. Profile/feed crawling is intentionally absent.
+26. Page type/account/date detection depends on what the platform exposes; unavailable fields remain empty.
+27. Stories, highlights, tagged posts, saved collections, albums, and profile feeds are scanned only when the content is already visible/accessible.
+28. Chrome 116+ desktop only.
+29. Platform DOM changes can break extraction and in-page button placement until adapters are updated.
+30. Chrome Web Store review may scrutinize social downloader extensions; use is limited to content you are authorized to save.
 
 ## Testing and verification
 
@@ -272,11 +283,11 @@ Verified in this repository:
 ```bash
 npm run typecheck   # strict TypeScript, app + configs
 npm run lint        # ESLint, zero warnings/errors
-npm run test:run    # 160 tests passing
+npm run test:run    # 170 tests passing
 npm run build       # loadable dist/ + manifest/package verification
 ```
 
-Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, the download service (pending/downloading/completed/failed/cancelled, browser-confirmed completion, byte progress, pause/resume, cancellation, retry, Save As, duplicates, Skip Downloaded, configurable concurrency, typed history), per-tab selection persistence and bulk UI, queue controls/failure summaries, Instagram profile pictures/grid/story targets, in-page overlay injection, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile cards, caption export, filename safety, URL normalization, settings/history/sites storage, typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
+Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, the download service (pending/downloading/completed/failed/cancelled, browser-confirmed completion, byte progress, pause/resume, cancellation, retry, Save As, duplicates, Skip Downloaded, configurable concurrency, typed history), per-tab selection persistence and bulk UI, queue controls/failure summaries, story/highlight models and expiration, story/highlight manager UI, highlight title folders/covers, Instagram profile pictures/grid/story targets, in-page overlay injection, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile cards, caption export, filename safety, URL normalization, settings/history/sites storage, typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
 
 **Not yet verified here:** live end-to-end downloads against Instagram, Facebook, and TikTok. That requires loading `dist/` in Chrome and testing with real pages you are authorized to access. The manual QA checklist:
 
@@ -296,9 +307,12 @@ Coverage includes platform/page/account detection, metadata normalization, forma
 - Start Select, checkbox toggles, Select all, Clear, and selected counts work; selection survives popup reopen for the same tab.
 - Parallel downloads obey the 1–3 settings cap; queue pause/resume/cancel/retry actions and failure summaries work.
 - Mixed-platform selections still save under each platform's folder.
+- Stories & highlights manager shows accessible stories with expiration, saves individual/all-from-account stories, and saves highlight media/covers.
+- Highlight files land under `MediaVault/<platform>/highlights/<Title>/`; expired stories are disabled with a clear reason.
+- Anonymous story viewing is explicitly unavailable; the UI does not claim to hide view activity.
 - Account selection persists and the popup page-context card reflects the chosen mock account.
 - Full history page shows stats, filters, empty state, and clear confirmation.
-- Side panel switches between Library and Queue; footer links open history/accounts/settings.
+- Side panel switches between Library and Queue; footer links open history/stories/accounts/settings.
 - A real download shows browser byte progress; completion appears only after Chrome finishes.
 - Cancel works for queued and in-flight jobs; retry restarts a failed job; Save As opens Chrome's folder picker.
 - Expired links fail with a rescan message rather than a false success.

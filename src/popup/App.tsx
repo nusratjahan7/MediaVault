@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, Globe2, ShieldCheck, Sparkles } from 'lucide-react';
+import { Copy, Globe2, Layers, ShieldCheck, Sparkles } from 'lucide-react';
 import { getAdapterForUrl } from '@/adapters/registry';
 import { PageContextCard } from '@/components/context/PageContextCard';
 import { PlatformBadge } from '@/components/media/PlatformBadge';
@@ -418,6 +418,24 @@ export function App() {
                 icon={<Copy className="size-3.5" aria-hidden="true" />}
               >
                 Copy caption & source URL
+              </Button>
+            )}
+            {(pageContext.pageKind === 'story' ||
+              pageContext.pageKind === 'highlight' ||
+              pageContext.pageKind === 'profile') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                block
+                onClick={() =>
+                  openExtensionPage(
+                    'stories.html',
+                    tab?.id !== undefined ? { tabId: tab.id } : undefined,
+                  )
+                }
+                icon={<Layers className="size-3.5" aria-hidden="true" />}
+              >
+                Stories & highlights
               </Button>
             )}
           </div>

@@ -1,9 +1,10 @@
 import { cn } from '@/utils/cn';
 
-export type PageNavId = 'history' | 'accounts' | 'settings';
+export type PageNavId = 'history' | 'accounts' | 'stories' | 'settings';
 
 const ITEMS: Array<{ id: PageNavId; label: string; href: string }> = [
   { id: 'history', label: 'History', href: 'history.html' },
+  { id: 'stories', label: 'Stories', href: 'stories.html' },
   { id: 'accounts', label: 'Accounts', href: 'accounts.html' },
   { id: 'settings', label: 'Settings', href: 'options.html' },
 ];

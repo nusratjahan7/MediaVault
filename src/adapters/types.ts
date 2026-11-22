@@ -5,6 +5,7 @@ import type {
 } from '@/types/media';
 import type { AccountIdentity, PageType, PlatformDetection } from '@/types/page';
 import type { PlatformId } from '@/types/platform';
+import type { HighlightMedia, StoryMedia } from '@/types/story';
 
 export interface ExtractContext {
   document: Document;
@@ -43,6 +44,18 @@ export interface PlatformAdapter {
 
   /** Return only the normalized media metadata for the current page. */
   extractMetadata(context: ExtractContext): MediaItem[];
+
+  /** Discover accessible stories on the current story page. */
+  discoverStories?(
+    context: ExtractContext,
+    discovery: AdapterDiscovery,
+  ): StoryMedia[];
+
+  /** Discover accessible highlights, their covers, and loaded highlight media. */
+  discoverHighlights?(
+    context: ExtractContext,
+    discovery: AdapterDiscovery,
+  ): HighlightMedia[];
 
   /** Return the download formats the platform exposes for one item. */
   getDownloadOptions(item: MediaItem): DownloadOption[];

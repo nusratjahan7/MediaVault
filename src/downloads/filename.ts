@@ -14,6 +14,8 @@ export interface DownloadPathSource {
   kind: MediaKind;
   url: string;
   author?: string;
+  collectionType?: 'story' | 'highlight' | 'album';
+  collectionTitle?: string;
 }
 
 export function inferExtension(item: DownloadPathSource): string {
@@ -45,5 +47,10 @@ export function buildDownloadPath(
     date: new Date(),
   });
 
-  return `${subfolder}/${item.platform}/${ensureFileExtension(rendered, extension)}`;
+  const collection =
+    item.collectionType === 'highlight' && item.collectionTitle
+      ? `highlights/${sanitizeSubfolder(item.collectionTitle)}/`
+      : '';
+
+  return `${subfolder}/${item.platform}/${collection}${ensureFileExtension(rendered, extension)}`;
 }

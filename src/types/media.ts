@@ -1,5 +1,6 @@
 import type { AccountIdentity, PageType } from './page';
 import type { PlatformId } from './platform';
+import type { HighlightMedia, StoryMedia } from './story';
 
 export type MediaKind = 'image' | 'video';
 
@@ -32,7 +33,8 @@ export type LimitationCode =
   | 'signed-url-expiry'
   | 'no-media'
   | 'partial-extraction'
-  | 'unsupported-media';
+  | 'unsupported-media'
+  | 'story-expired';
 
 export type LimitationSeverity = 'info' | 'warning' | 'blocking';
 
@@ -64,6 +66,8 @@ export interface MediaItem {
   formats?: MediaFormat[];
   downloadStatus?: MediaDownloadStatus;
   account?: AccountIdentity;
+  collectionType?: 'story' | 'highlight' | 'album';
+  collectionTitle?: string;
 }
 
 export interface ScanResult {
@@ -74,4 +78,6 @@ export interface ScanResult {
   limitations: ScanLimitation[];
   pageType?: PageType;
   account?: AccountIdentity | null;
+  stories?: StoryMedia[];
+  highlights?: HighlightMedia[];
 }
