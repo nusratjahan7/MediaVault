@@ -46,6 +46,18 @@ export function inferPageKind(url: URL): PageKind {
       if (/tagged/i.test(url.pathname)) {
         return 'tagged';
       }
+      if (
+        /^\/(media\/set|photos\/album|album\.php)/.test(url.pathname) ||
+        url.searchParams.get('sk')?.toLowerCase() === 'album'
+      ) {
+        return 'album';
+      }
+      if (
+        /^\/reels?\//.test(url.pathname) ||
+        url.pathname.startsWith('/share/r/')
+      ) {
+        return 'reel';
+      }
       if (FACEBOOK_VIDEO.test(url.pathname)) {
         return 'video';
       }
@@ -86,6 +98,8 @@ export function pageKindLabel(kind: PageKind): string {
       return 'Reel';
     case 'video':
       return 'Video';
+    case 'album':
+      return 'Album';
     case 'photo':
       return 'Photo';
     case 'profile':

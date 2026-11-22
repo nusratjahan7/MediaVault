@@ -12,6 +12,8 @@ Module 4 (Single Media Download System) is complete: a platform-independent `Dow
 
 Module 5 (Instagram Media Downloader) is complete: profile pictures, grid media with linked post context, carousel/reel/story/highlight discovery, inline post-action buttons, profile-grid overlay buttons, caption/source export, and Skip Downloaded deduplication. Instagram selectors live in the adapter; the overlay UI is isolated and generic.
 
+Module 6 (Facebook Media Downloader) is complete: photos, direct videos, rendered album items with per-photo ids, reels, visible profile/page media, Facebook URL/page-type detection, `data-utime` dates, embedded HD/SD sources, caption export, and a direct-video guard that rejects page-only or adaptive streams.
+
 ## 2. Runtime topology
 
 ```
@@ -108,7 +110,7 @@ Every platform implements `PlatformAdapter` (`src/adapters/types.ts`):
 ```ts
 matches(url)                    // URL ownership
 detectPlatform(url)             // { platform, supported, url }
-detectPageType(ctx)             // profile/feed/post/reel/video/story/highlight/tagged/saved/unknown
+detectPageType(ctx)             // profile/feed/post/reel/video/story/highlight/tagged/saved/album/unknown
 identifyAccount(ctx)            // visible account identity or null
 discoverMedia(ctx)              // AdapterDiscovery { platform, pageType, account, items, limitations }
 extractMetadata(ctx)            // MediaItem[]
@@ -124,8 +126,15 @@ Normalized metadata never assumes parity across platforms. Missing usernames, da
 - `extract.ts` adds profile pictures on profile pages, direct story/highlight media, and profile-grid images with each item's linked post URL/id.
 - `in-page.ts` owns all placement selectors: post action rows, grid anchors, story/highlight media containers. It returns no targets on login/private pages.
 - `verify-dist`-built content code mounts a shadow-DOM overlay only for Instagram, only after site access is enabled, and not in demo mode. Grid buttons save the rendered grid image and explicitly tell the user to open the post for original media.
-- Caption + account + source URL export lives in `utils/export.ts`; Instagram surfaces the copy action in the popup.
+- Caption + account + source URL export lives in `utils/export.ts`; Instagram and Facebook surface the copy action in the popup.
 - Skip Downloaded is enforced in the shared download engine using local completed history (media id or URL). See [INSTAGRAM.md](./INSTAGRAM.md).
+
+### Facebook-specific layer
+
+- `page-type.ts` detects photos, posts, videos, reels, albums, stories/highlights, tagged/saved surfaces, and named/profile pages across Facebook URL variants.
+- `extract.ts` adds per-photo album links/ids, `data-utime` dates, direct `og:video` validation, DOM video sources, and embedded `hd_src`/`sd_src`/`playable_url` formats.
+- Page-only or adaptive video links are never treated as direct files; blocked/private/login states produce blocking limitations.
+- Profile/page discovery is limited to visible rendered media. See [FACEBOOK.md](./FACEBOOK.md).
 
 ## 5. Message passing
 
@@ -294,7 +303,7 @@ npm run build
 
 - Strict TypeScript across `src/` and build configs.
 - ESLint 9 with React hooks rules.
-- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, Instagram profile pictures/grid/story discovery, in-page action placement and click handling, caption export, Skip Downloaded, download service states/progress/pause/cancel/retry/Save As/duplicates, queue integration, storage, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
+- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, Instagram profile pictures/grid/story discovery, Facebook albums/reels/embedded video/direct-video guards, in-page action placement and click handling, caption export, Skip Downloaded, download service states/progress/pause/cancel/retry/Save As/duplicates, queue integration, storage, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
 - `verify-dist.mjs` checks the built package as Chrome would consume it, including all five HTML surfaces.
 
 Live Chrome E2E against real social pages has **not** been run in this environment. The manual QA matrix is in the README.

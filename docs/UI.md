@@ -83,7 +83,7 @@ Rules enforced by design:
 - Grid buttons save the rendered grid image and show a toast telling the user to open the post for original media.
 - Feedback is shown in a shadow-DOM toast stack; no page CSS leaks into the controls.
 
-The popup also offers **Copy caption & source URL** for Instagram and distinguishes “already downloaded” from unavailable media when Skip Downloaded is on.
+The popup also offers **Copy caption & source URL** for Instagram and Facebook, and distinguishes “already downloaded” from unavailable media when Skip Downloaded is on. Facebook page types include albums and reels alongside photos, videos, profiles, and feeds.
 
 ## Live download feedback
 

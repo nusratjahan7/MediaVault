@@ -134,6 +134,63 @@ describe('popup', () => {
     );
   });
 
+  it('shows the caption export action for Facebook pages', async () => {
+    setActiveTabUrl('https://www.facebook.com/photo/?fbid=123');
+    respondToBackground((request) => {
+      switch (request.type) {
+        case 'SITES_STATUS':
+          return {
+            ok: true,
+            data: [
+              {
+                platform: 'facebook',
+                label: 'Facebook',
+                enabled: true,
+                permissionGranted: true,
+              },
+            ],
+          };
+        case 'SCAN_TAB':
+          return {
+            ok: true,
+            data: {
+              platform: 'facebook',
+              pageUrl: 'https://www.facebook.com/photo/?fbid=123',
+              scannedAt: 1,
+              items: [
+                {
+                  id: 'facebook_abc12345',
+                  platform: 'facebook',
+                  kind: 'image',
+                  url: 'https://scontent.xx.fbcdn.net/v/photo.jpg',
+                  thumbnailUrl: 'https://scontent.xx.fbcdn.net/v/photo.jpg',
+                  author: 'atlasfilms',
+                  caption: 'A day at the lake',
+                  downloadable: true,
+                },
+              ],
+              limitations: [],
+              pageType: 'post',
+              account: {
+                platform: 'facebook',
+                username: 'atlasfilms',
+                displayName: 'Atlas Films',
+              },
+            },
+          };
+        default:
+          return undefined;
+      }
+    });
+
+    renderPopup();
+
+    expect(await screen.findByText('A day at the lake')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Copy caption & source URL' }),
+    ).toBeTruthy();
+  });
+
   it('shows a clear unsupported-page state', async () => {
     setActiveTabUrl('https://example.com/');
 

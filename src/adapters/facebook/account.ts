@@ -17,6 +17,8 @@ const RESERVED_PROFILE_PATHS = new Set([
   'story.php',
   'stories',
   'saved',
+  'media',
+  'album.php',
   'groups',
   'marketplace',
   'gaming',

@@ -59,7 +59,18 @@ export function detectFacebookPageType(url: URL): PageType {
   }
 
   if (
-    /^\/(watch|videos|video\.php|reel)(\/|$)/.test(path) ||
+    /^\/(media\/set|photos\/album|album\.php)(\/|$)/.test(path) ||
+    sk === 'album'
+  ) {
+    return 'album';
+  }
+
+  if (/^\/reels?\//.test(path) || path.startsWith('/share/r/')) {
+    return 'reel';
+  }
+
+  if (
+    /^\/(watch|videos|video\.php)(\/|$)/.test(path) ||
     path.startsWith('/share/v/')
   ) {
     return 'video';

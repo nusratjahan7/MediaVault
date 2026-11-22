@@ -400,7 +400,8 @@ export function App() {
               onSwitchAccount={demo ? openAccounts : undefined}
               compact
             />
-            {pageContext.platform === 'instagram' && (
+            {(pageContext.platform === 'instagram' ||
+              pageContext.platform === 'facebook') && (
               <Button
                 variant="ghost"
                 size="sm"

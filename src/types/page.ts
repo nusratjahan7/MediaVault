@@ -10,6 +10,7 @@ export type PageType =
   | 'highlight'
   | 'tagged'
   | 'saved'
+  | 'album'
   | 'unknown';
 
 export interface PlatformDetection {

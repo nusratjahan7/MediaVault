@@ -37,7 +37,7 @@ Extraction failure never throws across the content-script boundary; it returns a
 | Platform | Supported detection |
 | --- | --- |
 | Instagram | Profile, feed, `/p/` post, reel, `/tv/` video, story, highlight, tagged, saved |
-| Facebook | Profile, feed, post/photo, video/watch/reel, story, highlight, tagged, saved |
+| Facebook | Profile/page, feed, post/photo, video/watch, reel, album, story, highlight, tagged, saved |
 | TikTok | Profile, feed, video, photo post, story, tagged, favorites/saved; unknown for unsupported paths |
 
 Detection lives in each adapter's `page-type.ts` and is unit-tested independently of DOM extraction.
@@ -84,6 +84,16 @@ Missing values stay `undefined`; no placeholder account, date, or media URL is f
 - Grid images are the rendered grid asset, not guaranteed originals; a limitation states this.
 - Login/private pages produce no in-page targets and blocking limitations.
 
+### Facebook specifics
+
+- URL variants cover `photo.php`/`photo`, `permalink.php`/`posts`, `watch/videos/video.php`, `reel(s)`, `media/set`, `album.php`, `profile.php`, `pages/people`, named pages, stories/highlights, and `sk=saved|tagged|album`.
+- Albums collect only linked album photos; each carries its own `fbid` and absolute photo URL.
+- Post dates come from `data-utime` (epoch seconds/ms) with meta fallback.
+- `og:video` is accepted only when it looks like a direct media file or `fbcdn.net` media path. Page-only links are rejected.
+- Embedded `hd_src`, `sd_src`, `playable_url`, and `browser_native_*` URLs become alternate MP4 formats when exposed.
+- Blob/MSE playback is unsupported; no stream reconstruction is attempted.
+- Profile/page media is limited to what is visible; login/private states are blocking limitations.
+
 ## Download options
 
 `getDownloadOptions(item)` returns only formats with a direct, permitted `http(s)` URL.
@@ -91,7 +101,7 @@ Missing values stay `undefined`; no placeholder account, date, or media URL is f
 | Platform | Typical options |
 | --- | --- |
 | Instagram | One source format (MP4 or JPG) inferred from the direct media URL |
-| Facebook | Direct MP4 or JPG; **none** for adaptive/blob video |
+| Facebook | Direct MP4/WebM or JPG; multiple MP4 alternates when embedded HD/SD sources exist; **none** for adaptive/blob or page-only video links |
 | TikTok | Playback MP4 and, when the page exposes it, a separate download-copy MP4 |
 
 Blocking restrictions, blob-only media, and invalid URLs return `[]`. The first option is marked `isDefault`.
