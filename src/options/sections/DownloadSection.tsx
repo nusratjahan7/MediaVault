@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Save } from 'lucide-react';
 import { Section } from '@/components/layout/Section';
 import { FilenameTemplateField } from '@/components/settings/FilenameTemplateField';
+import { FolderOrganizationFields } from '@/components/settings/FolderOrganizationFields';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Toggle } from '@/components/ui/Toggle';
 import { useSettings } from '@/hooks/useSettings';
 import { useToast } from '@/hooks/useToast';
-import { DEFAULT_SETTINGS } from '@/storage/settings';
+import { DEFAULT_FILENAME_TEMPLATES } from '@/storage/settings';
 import { getErrorMessage } from '@/utils/errors';
 import { sanitizeSubfolder } from '@/utils/filename';
 
@@ -17,15 +18,27 @@ export function DownloadSection() {
   const { toast } = useToast();
   const [subfolder, setSubfolder] = useState(settings.downloadSubfolder);
   const [template, setTemplate] = useState(settings.filenameTemplate);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(
+    settings.selectedFilenameTemplateId ?? '',
+  );
+  const [templateName, setTemplateName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   useEffect(() => {
     setSubfolder(settings.downloadSubfolder);
     setTemplate(settings.filenameTemplate);
-  }, [settings.downloadSubfolder, settings.filenameTemplate]);
+    setSelectedTemplateId(settings.selectedFilenameTemplateId ?? '');
+  }, [
+    settings.downloadSubfolder,
+    settings.filenameTemplate,
+    settings.selectedFilenameTemplateId,
+  ]);
 
   const dirty =
-    subfolder !== settings.downloadSubfolder || template !== settings.filenameTemplate;
+    subfolder !== settings.downloadSubfolder ||
+    template !== settings.filenameTemplate ||
+    selectedTemplateId !== (settings.selectedFilenameTemplateId ?? '');
   const subfolderInvalid = subfolder.trim().length === 0;
   const templateInvalid = template.trim().length === 0;
 
@@ -49,6 +62,7 @@ export function DownloadSection() {
       await updateSettings({
         downloadSubfolder: sanitizeSubfolder(subfolder),
         filenameTemplate: template.trim(),
+        selectedFilenameTemplateId: selectedTemplateId || undefined,
       });
       toast({
         title: 'Download settings saved',
@@ -59,6 +73,95 @@ export function DownloadSection() {
       toast({ title: 'Could not save settings', description: getErrorMessage(caught), variant: 'error' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const selectTemplate = (id: string) => {
+    setSelectedTemplateId(id);
+
+    if (!id) {
+      return;
+    }
+
+    const selected = settings.filenameTemplates.find((entry) => entry.id === id);
+    if (selected) {
+      setTemplate(selected.template);
+    }
+  };
+
+  const saveTemplate = async () => {
+    if (!template.trim()) {
+      toast({
+        title: 'Template is empty',
+        description: 'Add at least one filename variable before saving.',
+        variant: 'error',
+      });
+      return;
+    }
+
+    if (settings.filenameTemplates.length >= 20) {
+      toast({
+        title: 'Template limit reached',
+        description: 'MediaVault supports up to 20 saved templates. Reset settings to return to the built-in set.',
+        variant: 'error',
+      });
+      return;
+    }
+
+    setSavingTemplate(true);
+
+    try {
+      const id = `custom-${Date.now().toString(36)}`;
+      const name = (templateName.trim() || 'Custom template').slice(0, 40);
+      const next = [
+        ...settings.filenameTemplates,
+        { id, name, template: template.trim() },
+      ];
+
+      await updateSettings({
+        filenameTemplates: next,
+        filenameTemplate: template.trim(),
+        selectedFilenameTemplateId: id,
+      });
+      setSelectedTemplateId(id);
+      setTemplateName('');
+      toast({
+        title: 'Template saved',
+        description: `“${name}” is now the active filename template.`,
+        variant: 'success',
+      });
+    } catch (caught) {
+      toast({
+        title: 'Could not save template',
+        description: getErrorMessage(caught),
+        variant: 'error',
+      });
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const resetTemplate = async () => {
+    const fallback =
+      settings.filenameTemplates.find((entry) => entry.id === 'default') ??
+      DEFAULT_FILENAME_TEMPLATES[0]!;
+
+    setTemplate(fallback.template);
+    setSelectedTemplateId(fallback.id);
+    setTemplateName('');
+
+    try {
+      await updateSettings({
+        filenameTemplate: fallback.template,
+        selectedFilenameTemplateId: fallback.id,
+      });
+      toast({ title: 'Filename template reset', variant: 'success' });
+    } catch (caught) {
+      toast({
+        title: 'Could not reset template',
+        description: getErrorMessage(caught),
+        variant: 'error',
+      });
     }
   };
 
@@ -95,23 +198,75 @@ export function DownloadSection() {
           )}
         </div>
 
-        <FilenameTemplateField
-          value={template}
-          subfolder={subfolder}
-          onChange={setTemplate}
-          onBlur={() => {
-            if (!template.trim()) {
-              setTemplate(settings.filenameTemplate);
-            }
-          }}
-        />
+        <div className="space-y-3 border-t border-border pt-4">
+          <div className="space-y-1.5">
+            <label htmlFor="saved-template" className="text-xs font-medium text-fg">
+              Saved templates
+            </label>
+            <Select
+              id="saved-template"
+              value={selectedTemplateId}
+              onChange={(event) => selectTemplate(event.target.value)}
+              aria-label="Select a filename template"
+            >
+              <option value="">Custom template</option>
+              {settings.filenameTemplates.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <FilenameTemplateField
+            value={template}
+            subfolder={subfolder}
+            organizeByAccount={settings.organizeByAccount}
+            organizeByCategory={settings.organizeByCategory}
+            splitByMediaType={settings.splitByMediaType}
+            onChange={(next) => {
+              setTemplate(next);
+              setSelectedTemplateId('');
+            }}
+            onBlur={() => {
+              if (!template.trim()) {
+                setTemplate(settings.filenameTemplate);
+                setSelectedTemplateId(settings.selectedFilenameTemplateId ?? '');
+              }
+            }}
+          />
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              value={templateName}
+              onChange={(event) => setTemplateName(event.target.value)}
+              placeholder="Template name"
+              maxLength={40}
+              aria-label="New template name"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              className="shrink-0"
+              loading={savingTemplate}
+              onClick={() => void saveTemplate()}
+              icon={<Save className="size-3.5" aria-hidden="true" />}
+            >
+              Save as template
+            </Button>
+          </div>
+        </div>
+
+        <FolderOrganizationFields />
 
         <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
           <div className="min-w-0">
             <p className="text-xs font-medium text-fg">Ask where to save each file</p>
             <p className="mt-0.5 max-w-[60ch] text-[11px] leading-relaxed text-muted">
               Uses Chrome’s native Save As dialog so you can choose the destination folder for
-              every download. When off, Chrome saves to your default download folder using the
+              every download. Chrome’s Downloads API does not allow extensions to persist an
+              arbitrary absolute folder, so this is the supported way to select a different
+              location. When off, Chrome saves under your default download folder using the
               subfolder above.
             </p>
           </div>
@@ -171,10 +326,10 @@ export function DownloadSection() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setTemplate(DEFAULT_SETTINGS.filenameTemplate)}
+            onClick={() => void resetTemplate()}
             icon={<RotateCcw className="size-3.5" aria-hidden="true" />}
           >
-            Reset template
+            Reset to default
           </Button>
         </div>
       </div>

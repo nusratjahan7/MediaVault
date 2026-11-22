@@ -8,6 +8,7 @@ import { APP_VERSION } from '@/constants';
 import { AboutSection } from './sections/AboutSection';
 import { AppearanceSection } from './sections/AppearanceSection';
 import { DownloadSection } from './sections/DownloadSection';
+import { FormatSection } from './sections/FormatSection';
 import { PreviewSection } from './sections/PreviewSection';
 import { PrivacySection } from './sections/PrivacySection';
 import { SitesSection } from './sections/SitesSection';
@@ -15,6 +16,7 @@ import { SitesSection } from './sections/SitesSection';
 const NAV_ITEMS = [
   { href: '#appearance', label: 'Appearance' },
   { href: '#downloads', label: 'Downloads' },
+  { href: '#formats', label: 'Format & quality' },
   { href: '#sites', label: 'Site access' },
   { href: '#preview', label: 'Interface preview' },
   { href: '#privacy', label: 'Privacy & data' },
@@ -87,6 +89,7 @@ export function App() {
           <div className="min-w-0 space-y-5">
             <AppearanceSection />
             <DownloadSection />
+            <FormatSection />
             <SitesSection />
             <PreviewSection />
             <PrivacySection />

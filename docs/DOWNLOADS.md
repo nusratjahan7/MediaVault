@@ -5,7 +5,7 @@
 `src/downloads/service.ts` exports `DownloadService` and the app singleton `downloadService`.
 
 ```ts
-enqueue(source, { autoStart? }): Promise<DownloadRecord>
+enqueue(source, { autoStart?, filename?, output? }): Promise<DownloadRecord>
 start(id?): void
 pause(id): Promise<boolean>
 resume(id): Promise<boolean>
@@ -42,7 +42,7 @@ Settings → Downloads → Parallel downloads accepts 1–3 (default 2). `Downlo
 
 ## Bulk queue
 
-Bulk selection enqueues multiple jobs through the same service. Queue UI exposes per-item status, Chrome byte progress, pause/resume (when supported), cancel, and retry. Failure count badges and per-item errors provide an error summary. Each item still generates its own path under `MediaVault/<platform>/`, preserving the original platform category.
+Bulk selection enqueues multiple jobs through the same service. Queue UI exposes per-item status, Chrome byte progress, pause/resume (when supported), cancel, and retry. Failure count badges and per-item errors provide an error summary. Each item still generates its own path under `MediaVault/<platform>/`, preserving the original platform category. Folder rules add optional account/category/media-type segments in `downloads/organization.ts`.
 
 ## Cancellation
 
@@ -64,10 +64,18 @@ Expired signed URLs are never rewritten, guessed, or fetched through a proxy.
 
 ## Destination and filenames
 
-- `chrome.downloads.download` receives a sanitized relative path (`MediaVault/<platform>/<safe-name>.<ext>`).
-- Duplicate names use `conflictAction: 'uniquify'`.
+- `chrome.downloads.download` receives a sanitized relative path (`<root>/<platform>/[account]/[category]/[title]/[type]/<safe-name>.<ext>`).
+- The active template renders username, date, internal/media ID, index, caption, location, platform, media type, and extension.
+- Invalid characters, traversal segments, reserved names, and overlength names are removed/capped; duplicate names use `conflictAction: 'uniquify'`.
 - Settings → Downloads → **Ask where to save each file** sets `saveAs: true`, invoking Chrome's native folder picker. When off, Chrome uses the default download folder plus the configured subfolder.
-- Original direct media URLs are used as-is; no transcoding or re-hosting occurs.
+- Chrome only accepts paths relative to Downloads; no absolute path is written by the extension.
+
+## Output, conversion, and sidecars
+
+- `downloads/output.ts` selects the highest exposed video source (or the exact source when selected) and records `DownloadOutputInfo` (extension, MIME, quality, label, converted/fallback note).
+- Images can be converted locally to JPG/PNG/WebP via `services/image-conversion.ts`; failures fall back to the original with a history note.
+- Sidecars (thumbnail, `.caption.txt`, `.metadata.json`) are separate jobs through the same service, concurrency, and folder rules.
+- Converted images use a local data URL for Chrome; history keeps the original source URL. No transcoding, remuxing, or re-hosting occurs.
 
 ## Skip Downloaded
 
@@ -78,7 +86,7 @@ The check uses completed local history only. Disabling the setting, deleting the
 ## History and reconciliation
 
 - Highlight media and covers carry `collectionType: 'highlight'`/`collectionTitle`, producing `MediaVault/<platform>/highlights/<title>/...` paths.
-- Every job writes the existing `HistoryEntry` shape with status, bytes, total bytes, paused flag, download id, and error.
+- Every job writes the existing `HistoryEntry` shape with status, bytes, total bytes, paused flag, download id, error, and actual output metadata.
 - On service-worker startup, active rows are reconciled against `chrome.downloads.search`; in-progress downloads are reattached to polling, completed rows are finalized, and missing/interrupted downloads become failed with a clear message.
 - `getHistory()` merges in-memory session records with persisted IndexedDB history.
 
@@ -98,5 +106,8 @@ The engine talks only to Chrome's Downloads API. It never uploads media, never p
 - retry creates a fresh browser download;
 - Save As maps to Chrome's `saveAs` flag;
 - duplicate filenames keep `uniquify`;
+- highest-source video selection and output quality;
+- image-conversion fallback with a visible note;
 - typed history comes from the service;
 - invalid/restricted sources are rejected.
+- `tests/downloads/sidecars.test.ts` covers thumbnail/caption/metadata sidecars.

@@ -79,10 +79,61 @@ describe('DownloadService', () => {
     expect(record.state).toBe('pending');
     expect(record.source.url).toBe(SOURCE.url);
     expect(record.filename).toMatch(
-      /^MediaVault\/instagram\/instagram-studio-[0-9a-f]{8}\.mp4$/,
+      /^MediaVault\/instagram\/videos\/instagram-studio-[0-9a-f]{8}\.mp4$/,
     );
     expect(chromeMock.downloads.download).not.toHaveBeenCalled();
     expect((await service.getStatus(record.id))?.state).toBe('pending');
+  });
+
+  it('downloads the highest exposed video source and records actual quality', async () => {
+    await saveSettings({ videoQuality: 'highest' });
+    const hdUrl = 'https://scontent.cdninstagram.com/v/hd.mp4';
+    const record = await service.enqueue({
+      ...SOURCE,
+      formats: [
+        {
+          id: 'sd',
+          label: 'SD',
+          extension: 'mp4',
+          mimeType: 'video/mp4',
+          kind: 'video',
+          quality: 'sd',
+          url: SOURCE.url,
+        },
+        {
+          id: 'hd',
+          label: 'HD 1080p',
+          extension: 'mp4',
+          mimeType: 'video/mp4',
+          kind: 'video',
+          quality: 'hd',
+          url: hdUrl,
+        },
+      ],
+    });
+
+    expect(record.output?.quality).toBe('hd');
+    expect(record.output?.label).toBe('MP4 · HD');
+
+    service.start(record.id);
+    await waitFor(() => getLastDownloadId());
+    expect(getLastDownloadOptions()?.url).toBe(hdUrl);
+  });
+
+  it('clearly falls back to the original image when conversion is unavailable', async () => {
+    await saveSettings({ imageFormat: 'webp' });
+    const source: DownloadSource = {
+      ...SOURCE,
+      id: 'instagram_photo123',
+      kind: 'image',
+      url: 'https://scontent.cdninstagram.com/v/photo.jpg',
+      formats: undefined,
+    };
+    const record = await service.enqueue(source);
+
+    expect(record.filename.endsWith('.jpg')).toBe(true);
+    expect(record.output?.converted).toBe(false);
+    expect(record.output?.note).toMatch(/media processing access/i);
   });
 
   it('completes only after Chrome confirms the download', async () => {

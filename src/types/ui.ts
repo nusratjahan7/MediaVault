@@ -41,6 +41,7 @@ export interface QueuePreviewItem {
   paused?: boolean;
   thumbnailUrl?: string;
   sizeLabel?: string;
+  outputLabel?: string;
   error?: string;
   createdAt: number;
 }

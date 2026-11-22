@@ -39,6 +39,8 @@ MediaVault never requests Chrome's `cookies` permission and does not read passwo
 - TikTok and Facebook discovery use only rendered DOM and public embedded page data. No signed internal API, anti-bot token, or authenticated endpoint is used.
 - Caption/source copying happens locally through the clipboard and is never uploaded.
 - Skip-Downloaded checks use local history only.
+- Optional image conversion reads the selected image from supported media CDN hosts with `credentials: 'omit'`, decodes/re-encodes it locally with the browser canvas, and never uploads it. Access is requested only when conversion is selected. If access is unavailable or conversion fails, the original file is saved.
+- Thumbnail/caption/metadata sidecars are generated locally and downloaded through Chrome's Downloads API.
 - Stories/highlights are read only from content already visible in your current authorized session. MediaVault does not provide anonymous story viewing, hide or alter your viewing activity, or bypass private-account/platform privacy controls. The platform may record views according to its policies.
 - No proxy, relay, or remote code is used.
 

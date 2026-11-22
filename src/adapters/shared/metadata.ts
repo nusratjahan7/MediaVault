@@ -33,6 +33,17 @@ function parseTimestamp(value: string | undefined): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+export function metaLocation(document: Document): string | undefined {
+  const candidates = [
+    metaContent(document, 'meta[property="og:location"]'),
+    metaContent(document, 'meta[name="location"]'),
+    metaContent(document, 'meta[property="place:location:name"]'),
+    document.querySelector<HTMLElement>('[data-location]')?.dataset.location,
+  ];
+
+  return candidates.find((value) => Boolean(value?.trim()))?.trim();
+}
+
 export function metaPublishedAt(document: Document): number | undefined {
   const candidates = [
     metaContent(document, 'meta[property="article:published_time"]'),
@@ -166,6 +177,7 @@ export function enrichMediaItem(
     account: item.account ?? account ?? undefined,
     postId,
     publishedAt: item.publishedAt ?? metaPublishedAt(context.document),
+    location: item.location ?? metaLocation(context.document),
     sourcePageUrl,
     postUrl: item.postUrl ?? sourcePageUrl,
     pageType,

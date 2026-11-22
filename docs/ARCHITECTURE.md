@@ -20,6 +20,10 @@ Module 8 (Bulk Download & Start Select) is complete: per-tab session-persisted s
 
 Module 10 (Stories & Highlights Manager) is complete: `StoryMedia`/`HighlightMedia` models, per-adapter story/highlight discovery, expiration info, story/highlight saves, highlight covers, title-based folders, and explicit anonymity/authorization limits.
 
+Module 11 (Folder Organization & Filename Rules) is complete: platform-independent folder derivation, optional account/category/media-type folders, highlight-title folders, filename variables/templates/previews, sanitization, traversal prevention, length limits, and duplicate handling through Chrome `uniquify`.
+
+Module 13 (Media Format & Quality) is complete: image output preferences with local canvas conversion, highest-exposed-source video selection, thumbnail/caption/metadata sidecars, and selected/actual output reporting. No video transcoding or audio/video remux is implemented.
+
 ## 2. Runtime topology
 
 ```
@@ -43,6 +47,9 @@ Module 10 (Stories & Highlights Manager) is complete: `StoryMedia`/`HighlightMed
 │   └─ handlers: scan · sites · history · downloads                           │
 │  services/permissions.ts   dynamic content-script registration              │
 │  downloads/service.ts      typed download engine + Chrome Downloads         │
+│  downloads/organization.ts platform-independent folder derivation           │
+│  downloads/filename.ts     paths, templates, safe segments                  │
+│  downloads/output.ts       image/video output resolution + sidecar metadata │
 │  downloads/queue.ts        background/UI compatibility facade               │
 │  storage/*                 chrome.storage.local + IndexedDB                 │
 └──────────────────────────────────┬──────────────────────────────────────────┘
@@ -82,10 +89,11 @@ Module 10 (Stories & Highlights Manager) is complete: `StoryMedia`/`HighlightMed
 | `src/mocks/` | UI-only sample data and preview preferences; never imports download services |
 | `src/services/` | Messaging, permissions, tabs, scan orchestration, centralized error boundary, page navigation |
 | `src/adapters/` | Platform URL matching/extraction + shared DOM helpers |
-| `src/downloads/` | `DownloadService` engine, Chrome Downloads client, safe filenames, queue facade |
+| `src/downloads/` | `DownloadService` engine, Chrome Downloads client, folder rules, filename/output resolution, sidecars, queue facade |
 | `src/storage/` | Settings/sites in `chrome.storage.local`, history in IndexedDB |
 | `src/types/` | Strict contracts and typed message unions |
-| `src/utils/` | URL, filename, format, ID, debounce, errors, logging |
+| `src/utils/` | URL, filename/templates, format labels, ID, debounce, errors, logging |
+| `src/services/image-conversion.ts` | Local canvas conversion and text data URLs; optional CDN access |
 | `public/` | Manifest and PNG icons copied verbatim into `dist/` |
 | `scripts/` | Icon generation and built-package verification |
 | `tests/` | Vitest unit/component tests, Chrome mock, DOM fixtures |
@@ -98,8 +106,8 @@ Module 10 (Stories & Highlights Manager) is complete: `StoryMedia`/`HighlightMed
 | `types/page.ts` | `PageType`, `PlatformDetection`, `AccountIdentity` |
 | `types/media.ts` | `MediaItem`, `MediaKind`, `MediaFormat`, `DownloadOption`, `MediaDownloadStatus`, `ScanResult` |
 | `types/story.ts` | `StoryMedia`, `HighlightMedia` |
-| `types/download.ts` | `DownloadJobSummary`, `EnqueueResult` |
-| `types/settings.ts` | `Settings`, `ThemePreference` |
+| `types/download.ts` | `DownloadSource`, `DownloadOutputInfo`, `DownloadRecord`, `EnqueueResult` |
+| `types/settings.ts` | `Settings`, `ThemePreference`, `FilenameTemplate`, image/video preferences |
 | `types/history.ts` | `HistoryEntry`, `DownloadStatus`, `HistoryQuery`, `HistoryPage` |
 | `types/messages.ts` | Request union, payload map, `ApiResponse<T>`, push events |
 
@@ -214,7 +222,7 @@ Error codes: `PERMISSION_DENIED`, `NOT_SUPPORTED`, `TAB_UNAVAILABLE`, `CONTENT_S
 | `activeTab` | Foundation | Identify the tab when the user opens the popup |
 | `sidePanel` | Foundation UI | Library surface (Chrome 116+) |
 | `downloads` | Later module | Save media and track progress (already implemented in this repo) |
-| `optional_host_permissions` | Foundation | Per-platform consent, requested at runtime |
+| `optional_host_permissions` | Foundation | Per-platform consent plus media-CDN access for local image conversion, requested at runtime |
 
 Design rules enforced by the manifest and build verifier:
 
@@ -263,7 +271,11 @@ getHistory(limit?)              // session + persisted history merged
 
 **Cancellation:** pending jobs are cancelled in memory. In-flight jobs call `chrome.downloads.cancel`; `USER_CANCELED` maps to cancelled, while a download Chrome already completed stays completed.
 
-**Retry:** failed/cancelled records reuse their history id and source, regenerate a safe filename, and start a new Chrome download. Expired URLs result in actionable failure messages; they are never rewritten or guessed.
+**Output/folders:** `output.ts` resolves the highest exposed video source or the requested image conversion, then `filename.ts` builds a category/account/title path and the active template. Converted images use a local data URL for the Chrome download while history keeps the original source. Retry recomputes output and filename under current settings.
+
+**Sidecars:** when enabled, the queue adds thumbnail, `.caption.txt`, and `.metadata.json` jobs through the same service/concurrency/folder rules. Sidecars carry explicit output metadata and use the main file's basename.
+
+**Retry:** failed/cancelled records reuse their history id and source, regenerate a safe filename and output, and start a new Chrome download. Expired URLs result in actionable failure messages; they are never rewritten or guessed.
 
 **Skip Downloaded:** when enabled, `enqueue` checks local history for a completed item with the same media id or URL and throws `ALREADY_DOWNLOADED`. The queue facade reports the count so popup and in-page surfaces can show a distinct message.
 
@@ -326,7 +338,7 @@ npm run build
 
 - Strict TypeScript across `src/` and build configs.
 - ESLint 9 with React hooks rules.
-- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, story/highlight models, expiration and title folders, the stories manager page, Instagram profile pictures/grid/story discovery, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile-card links and bulk selection, per-tab selection persistence and concurrency limits, in-page action placement and click handling, caption export, Skip Downloaded, download service states/progress/pause/cancel/retry/Save As/duplicates, queue controls and failure summary, storage, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
+- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, story/highlight models, expiration and title folders, the stories manager page, folder organization, filename variables/templates/sanitization/traversal, saved-template UI, highest-source selection, local image conversion/fallback, sidecars, output reporting, Instagram profile pictures/grid/story discovery, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile-card links and bulk selection, per-tab selection persistence and concurrency limits, in-page action placement and click handling, caption export, Skip Downloaded, download service states/progress/pause/cancel/retry/Save As/duplicates, queue controls and failure summary, storage, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
 - `verify-dist.mjs` checks the built package as Chrome would consume it, including all six HTML surfaces.
 
 Live Chrome E2E against real social pages has **not** been run in this environment. The manual QA matrix is in the README.
@@ -342,6 +354,7 @@ Live Chrome E2E against real social pages has **not** been run in this environme
 - Caption export copies text locally to the clipboard; nothing is uploaded.
 - Bulk selections live in `chrome.storage.session` per tab, are never synced, and clear when the browser session ends.
 - Stories/highlights are read only from content already visible in the authorized session; MediaVault does not provide anonymous viewing or conceal view activity.
+- Image conversion fetches only the selected media URL from optional CDN hosts with `credentials: 'omit'`; decoding is local and nothing is uploaded. Denied/unavailable conversion falls back to the original.
 - TikTok discovery uses public embedded page data only; no signed internal API or anti-bot token is used.
 - Demo thumbnails are local SVG data URIs and demo actions never call Chrome Downloads.
 - Private/restricted content is reported as a limitation, never bypassed.

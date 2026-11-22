@@ -9,6 +9,8 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 - [Architecture](./docs/ARCHITECTURE.md) — module boundaries, messaging, errors, storage, permissions, build pipeline
 - [Platform adapters](./docs/ADAPTERS.md) — detection, account identity, metadata, formats, resilience
 - [Download engine](./docs/DOWNLOADS.md) — service API, states, progress, cancellation, retry, folder choice
+- [Folder organization & filenames](./docs/ORGANIZATION.md) — folders, templates, variables, sanitization, duplicates
+- [Format & quality](./docs/FORMATS.md) — image conversion, video source selection, sidecars, output reporting
 - [Instagram adapter](./docs/ADAPTERS.md#instagram-specifics) — page/media support, in-page buttons, profile grids, stories, Skip Downloaded
 - [Facebook module](./docs/FACEBOOK.md) — albums, reels, direct-video safeguards, metadata, URL formats
 - [TikTok module](./docs/TIKTOK.md) — videos, thumbnails, slideshows, profile discovery, bulk selection
@@ -29,8 +31,10 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 - **Module 7 — TikTok Media Downloader:** complete. Current videos, thumbnails, slideshows, multi-video profile discovery, profile-card link handling, caption export, and bulk selection through the shared engine.
 - **Module 8 — Bulk Download & Start Select:** complete. Session-persisted per-tab selection, checkbox overlays, select-all/clear/remove, configurable 1–3 concurrency, per-item queue controls, retry, failure summaries, and platform-folder preservation.
 - **Module 10 — Stories & Highlights Manager:** complete. StoryMedia/HighlightMedia models, per-adapter story/highlight discovery, expiration information, per-story/account saves, highlight titles, cover downloads, and explicit privacy/anonymity limitations.
+- **Module 11 — Folder Organization & Filename Rules:** complete. Optional account/category/media-type folders, per-account sorting, posts/videos/Reels/stories/highlights folders, highlight-title organization, filename variables, live preview, saved/reusable templates, reset, sanitization, traversal protection, length limits, and Chrome uniquify duplicates.
+- **Module 13 — Media Format & Quality:** complete. Original/JPG/PNG/WebP image preferences with local canvas conversion, highest-exposed-source video selection, thumbnail/caption/metadata sidecars, and selected/actual format reporting. No video transcoding or audio/video remuxing is claimed.
 
-All downloads use Chrome's Downloads API directly. No media is uploaded, proxied, or fetched through an external server.
+All downloads use Chrome's Downloads API directly. No media is uploaded, proxied, or routed through a MediaVault server.
 
 ## What it does
 
@@ -46,6 +50,12 @@ All downloads use Chrome's Downloads API directly. No media is uploaded, proxied
 - Runs 1–3 configurable parallel downloads with pause/resume/cancel/retry and failure summaries.
 - Discovers visible stories and highlights, shows expiration when known, saves individual stories or all from an account, and saves highlight media/covers.
 - Organizes highlight downloads by their title under each platform folder.
+- Sorts downloads with optional account, category, and media-type folders.
+- Builds safe filenames from username, date, media ID, index, caption, location, platform, media type, and extension.
+- Saves reusable filename templates with a live path preview and reset-to-default.
+- Preserves original images or converts supported images locally to JPG/PNG/WebP.
+- Selects the highest legitimately exposed video source; never invents 4K/60fps/lossless quality.
+- Optionally saves thumbnails, caption text, and source/publication metadata sidecars.
 - Adds Instagram download buttons beside post actions and on accessible profile-grid items.
 - Saves profile pictures, carousel slides, reels, and directly accessible story/highlight media where permitted.
 - Discovers Facebook photos, direct videos, albums, reels, and visible profile/page media.
@@ -124,7 +134,9 @@ On Facebook, the popup lists visible photos, direct video sources, rendered albu
 
 On TikTok, the open video and its cover thumbnail are listed. Public embedded profile data can expose multiple videos; otherwise visible profile cards appear as links with downloadable thumbnails and a clear “open the video” reason. Bulk selection works for every accessible video/image/thumbnail item.
 
-To choose the destination folder yourself, enable **Settings → Downloads → Ask where to save each file**. Chrome then shows its native Save As dialog for every download. Otherwise Chrome saves to your default download folder plus the configured subfolder.
+To choose the destination folder yourself, enable **Settings → Downloads → Ask where to save each file**. Chrome then shows its native Save As dialog for every download. Otherwise Chrome saves to your default download folder plus the configured subfolder. Chrome's Downloads API does not let an extension persist an arbitrary absolute folder, so the Save As picker is the supported per-download choice.
+
+Settings → Downloads controls account, category, and media-type folders plus the filename template library and live preview. Settings → Format & quality controls image output, highest-source video selection, and thumbnail/caption/metadata sidecars. Actual queued format and quality appear in queue and history rows.
 
 Enable **Settings → Downloads → Skip Downloaded** to block media already completed in local history. The popup and in-page toasts distinguish “already downloaded” from unavailable media.
 
@@ -166,7 +178,7 @@ src/
     instagram/                    profile stories/grid/profile-picture + in-page targets
     facebook/                     albums/reels/direct-video guards + post metadata
     tiktok/                       videos/thumbnails/multi-item profile parsing
-  downloads/         DownloadService engine, Chrome client, safe filename builder, queue facade
+  downloads/         DownloadService, Chrome client, folder rules, filename builder, output/sidecars, queue
   storage/           chrome.storage settings/sites + session selection + IndexedDB history
   types/             Strict shared contracts, message unions, UI contracts
   utils/             URL, filename, page context, status, formatting, errors, logging
@@ -275,6 +287,12 @@ Known limits (also shown in-product):
 28. Chrome 116+ desktop only.
 29. Platform DOM changes can break extraction and in-page button placement until adapters are updated.
 30. Chrome Web Store review may scrutinize social downloader extensions; use is limited to content you are authorized to save.
+31. Chrome only allows relative Downloads paths; the Save As dialog is the supported way to choose another folder. MediaVault never writes absolute filesystem paths.
+32. Image conversion requires optional media-processing access for supported CDN hosts. If access, CORS/fetch, canvas, or the source type is unavailable, the original file is kept with a visible note.
+33. Image conversion re-encodes (not lossless). GIF conversion is not attempted.
+34. Video is never transcoded or remuxed. Highest quality means the best source exposed by the page; separate audio/video streams are not combined, and 4K/60fps/lossless is never promised.
+35. Caption/metadata sidecars use local data URLs through Chrome Downloads; sidecar downloads still need live Chrome E2E verification.
+36. Location is only available when the page exposes location metadata; otherwise `{location}` is omitted.
 
 ## Testing and verification
 
@@ -283,11 +301,11 @@ Verified in this repository:
 ```bash
 npm run typecheck   # strict TypeScript, app + configs
 npm run lint        # ESLint, zero warnings/errors
-npm run test:run    # 170 tests passing
+npm run test:run    # 197 tests passing
 npm run build       # loadable dist/ + manifest/package verification
 ```
 
-Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, the download service (pending/downloading/completed/failed/cancelled, browser-confirmed completion, byte progress, pause/resume, cancellation, retry, Save As, duplicates, Skip Downloaded, configurable concurrency, typed history), per-tab selection persistence and bulk UI, queue controls/failure summaries, story/highlight models and expiration, story/highlight manager UI, highlight title folders/covers, Instagram profile pictures/grid/story targets, in-page overlay injection, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile cards, caption export, filename safety, URL normalization, settings/history/sites storage, typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
+Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, the download service (pending/downloading/completed/failed/cancelled, browser-confirmed completion, byte progress, pause/resume, cancellation, retry, Save As, duplicates, Skip Downloaded, configurable concurrency, typed history), per-tab selection persistence and bulk UI, queue controls/failure summaries, story/highlight models and expiration, story/highlight manager UI, highlight title folders/covers, folder organization, filename templates/variables/previews, filename sanitization/traversal/length, saved-template settings UI, highest-source video selection, local image-conversion success and fallback, thumbnail/caption/metadata sidecars, actual output reporting, Instagram profile pictures/grid/story targets, in-page overlay injection, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile cards, caption export, filename safety, URL normalization, settings/history/sites storage, typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
 
 **Not yet verified here:** live end-to-end downloads against Instagram, Facebook, and TikTok. That requires loading `dist/` in Chrome and testing with real pages you are authorized to access. The manual QA checklist:
 
@@ -310,6 +328,12 @@ Coverage includes platform/page/account detection, metadata normalization, forma
 - Stories & highlights manager shows accessible stories with expiration, saves individual/all-from-account stories, and saves highlight media/covers.
 - Highlight files land under `MediaVault/<platform>/highlights/<Title>/`; expired stories are disabled with a clear reason.
 - Anonymous story viewing is explicitly unavailable; the UI does not claim to hide view activity.
+- Folder toggles produce the previewed account/category/media-type paths; hostile account/title values cannot escape the folder.
+- Saved filename templates can be selected, saved, previewed, and reset; long captions and filenames are shortened safely.
+- A selected image conversion either produces the target extension or falls back to the original with a note in history.
+- Highest-source video selection records HD/Source quality and the actual extension in history.
+- Thumbnail, caption, and metadata sidecars appear as separate history entries and use the same folder.
+- Media processing access is requested only from Format & quality when conversion is selected.
 - Account selection persists and the popup page-context card reflects the chosen mock account.
 - Full history page shows stats, filters, empty state, and clear confirmation.
 - Side panel switches between Library and Queue; footer links open history/stories/accounts/settings.

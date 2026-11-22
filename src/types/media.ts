@@ -66,6 +66,9 @@ export interface MediaItem {
   formats?: MediaFormat[];
   downloadStatus?: MediaDownloadStatus;
   account?: AccountIdentity;
+  location?: string;
+  index?: number;
+  sidecar?: 'thumbnail' | 'caption' | 'metadata';
   collectionType?: 'story' | 'highlight' | 'album';
   collectionTitle?: string;
 }

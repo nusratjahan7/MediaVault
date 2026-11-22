@@ -16,6 +16,7 @@ import {
 } from '@/storage/history';
 import { getSettings } from '@/storage/settings';
 import type {
+  DownloadOutputInfo,
   DownloadRecord,
   DownloadSource,
   DownloadState,
@@ -26,6 +27,7 @@ import { AppError, getErrorMessage, isAppError } from '@/utils/errors';
 import { createId } from '@/utils/id';
 import { logger } from '@/utils/logger';
 import { isHttpUrl } from '@/utils/url';
+import { sanitizeDownloadPath } from '@/utils/filename';
 import {
   cancelDownload,
   describeDownloadError,
@@ -36,6 +38,7 @@ import {
   startDownload,
 } from './client';
 import { buildDownloadPath } from './filename';
+import { prepareDownloadOutput } from './output';
 
 const PROGRESS_POLL_MS = 700;
 const SESSION_HISTORY_LIMIT = 100;
@@ -44,6 +47,7 @@ interface InternalJob extends DownloadRecord {
   persist: boolean;
   persisted: boolean;
   lastPersistedAt: number;
+  downloadUrl?: string;
 }
 
 function isTerminal(state: DownloadState): boolean {
@@ -114,6 +118,10 @@ export function downloadSourceFromMediaItem(item: MediaItem): DownloadSource {
     filenameHint: item.filenameHint,
     formats: item.formats,
     downloadStatus: item.downloadStatus,
+    location: item.location,
+    index: item.index,
+    sidecar: item.sidecar,
+    pageType: item.pageType,
     collectionType: item.collectionType,
     collectionTitle: item.collectionTitle,
   };
@@ -135,6 +143,10 @@ function sourceToMediaItem(source: DownloadSource): MediaItem {
     filenameHint: source.filenameHint,
     formats: source.formats,
     downloadStatus: source.downloadStatus,
+    location: source.location,
+    index: source.index,
+    sidecar: source.sidecar,
+    pageType: source.pageType,
     collectionType: source.collectionType,
     collectionTitle: source.collectionTitle,
     downloadable: source.downloadStatus
@@ -154,6 +166,7 @@ function toHistoryEntry(job: InternalJob): HistoryEntry {
     totalBytes: job.totalBytes,
     paused: job.paused,
     error: job.error,
+    output: job.output,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
   };
@@ -171,6 +184,7 @@ function toRecord(job: InternalJob): DownloadRecord {
     progress: job.progress,
     paused: job.paused,
     error: job.error,
+    output: job.output,
     attempts: job.attempts,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
@@ -200,6 +214,7 @@ function recordFromHistory(entry: HistoryEntry): DownloadRecord {
     progress,
     paused: entry.paused,
     error: entry.error,
+    output: entry.output,
     attempts: entry.downloadId !== undefined ? 1 : 0,
     createdAt: entry.createdAt,
     updatedAt: entry.updatedAt,
@@ -207,7 +222,15 @@ function recordFromHistory(entry: HistoryEntry): DownloadRecord {
 }
 
 function sourceIsDownloadable(source: DownloadSource): boolean {
-  if (!source.url || !isHttpUrl(source.url)) {
+  if (!source.url) {
+    return false;
+  }
+
+  const supportedUrl = source.sidecar
+    ? source.url.startsWith('data:') || isHttpUrl(source.url)
+    : isHttpUrl(source.url);
+
+  if (!supportedUrl) {
     return false;
   }
 
@@ -235,7 +258,11 @@ export class DownloadService {
 
   async enqueue(
     source: DownloadSource,
-    options: { autoStart?: boolean } = {},
+    options: {
+      autoStart?: boolean;
+      filename?: string;
+      output?: DownloadOutputInfo;
+    } = {},
   ): Promise<DownloadRecord> {
     if (!sourceIsDownloadable(source)) {
       throw new AppError(
@@ -261,13 +288,26 @@ export class DownloadService {
       }
     }
 
-    const filename = buildDownloadPath(source, settings);
+    const prepared = await prepareDownloadOutput(
+      source,
+      settings,
+      options.output,
+    );
+    const output = options.output ?? prepared.output;
+    const filename = options.filename
+      ? sanitizeDownloadPath(options.filename)
+      : buildDownloadPath(
+          { ...source, outputExtension: prepared.extension },
+          settings,
+        );
     const now = Date.now();
     const job: InternalJob = {
       id: createId('dl'),
       source,
       state: 'pending',
       filename,
+      output,
+      downloadUrl: prepared.url,
       attempts: 0,
       createdAt: now,
       updatedAt: now,
@@ -491,8 +531,28 @@ export class DownloadService {
     job.progress = undefined;
     job.paused = false;
     job.attempts += 1;
-    job.filename = buildDownloadPath(job.source, settings);
+    const prepared = await prepareDownloadOutput(
+      job.source,
+      settings,
+      job.source.sidecar ? job.output : undefined,
+    );
+    job.output = job.source.sidecar ? job.output : prepared.output;
+    job.downloadUrl = prepared.url;
+    job.filename = job.source.sidecar
+      ? job.filename
+      : buildDownloadPath(
+          { ...job.source, outputExtension: prepared.extension },
+          settings,
+        );
     job.updatedAt = Date.now();
+
+    if (job.persisted) {
+      await updateHistoryEntry(job.id, {
+        filename: job.filename,
+        output: job.output,
+        updatedAt: job.updatedAt,
+      });
+    }
 
     if (!this.pending.some((candidate) => candidate.id === job?.id)) {
       this.pending.push(job);
@@ -600,7 +660,7 @@ export class DownloadService {
     try {
       const settings = await getSettings();
       const downloadId = await startDownload({
-        url: job.source.url,
+        url: job.downloadUrl ?? job.source.url,
         filename: job.filename,
         conflictAction: 'uniquify',
         saveAs: settings.askWhereToSave,

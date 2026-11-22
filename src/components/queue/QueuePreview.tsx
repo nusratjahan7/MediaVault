@@ -89,6 +89,12 @@ function QueueRow({ item, onPause, onResume, onCancel, onRetry }: QueueRowProps)
 
           <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-muted">
             <span className="capitalize">{item.platform}</span>
+            {item.outputLabel && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{item.outputLabel}</span>
+              </>
+            )}
             {item.sizeLabel && (
               <>
                 <span aria-hidden="true">·</span>

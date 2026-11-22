@@ -100,6 +100,14 @@ The popup also offers **Copy caption & source URL** for Instagram, Facebook, and
 - Failed/cancelled rows expose Retry.
 - A failure count badge and per-item error text summarize problems; the download bar shows overall saved/failed/total progress.
 
+## Download organization & format settings
+
+- Settings → Downloads includes folder toggles (account/category/media-type), a path preview, saved filename templates, variable chips, a live filename preview, save-as-template, and reset-to-default.
+- Settings → Format & quality includes image output (Original/JPG/PNG/WebP), local media-processing access, highest/exact video source, and thumbnail/caption/metadata sidecar toggles.
+- Queue and history rows show the actual output label (`MP4 · HD`, `PNG · Converted`, `TXT · Caption`, etc.); history also shows conversion/fallback notes.
+- Media cards show the exposed source format/quality.
+- Settings copy explicitly states: no upscaling, no audio/video remux, no 4K/60fps/lossless promises.
+
 ## Stories & highlights page
 
 - Opened from the popup on a story/highlight/profile page or the Stories navigation item.

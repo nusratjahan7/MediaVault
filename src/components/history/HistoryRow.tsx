@@ -108,6 +108,11 @@ export function HistoryRow({
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
           <Badge tone={meta.tone}>{meta.label}</Badge>
           <PlatformBadge platform={entry.item.platform} />
+          {entry.output && (
+            <Badge tone="neutral" title={entry.output.note}>
+              {entry.output.label}
+            </Badge>
+          )}
           <span className="text-[10px] text-muted">
             {formatRelativeTime(entry.createdAt)}
           </span>
@@ -122,6 +127,11 @@ export function HistoryRow({
 
         {entry.error && (
           <p className={cn('mt-1 text-[10px] leading-relaxed text-danger')}>{entry.error}</p>
+        )}
+        {entry.output?.note && !entry.error && (
+          <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-muted">
+            {entry.output.note}
+          </p>
         )}
       </div>
     </div>

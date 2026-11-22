@@ -1,4 +1,5 @@
 import type { MediaKind } from '@/types/media';
+import type { PageType } from '@/types/page';
 import type { PlatformId } from '@/types/platform';
 import type { Settings } from '@/types/settings';
 import {
@@ -7,6 +8,7 @@ import {
   sanitizeSubfolder,
 } from '@/utils/filename';
 import { extensionFromUrl } from '@/utils/url';
+import { buildFolderSegments } from './organization';
 
 export interface DownloadPathSource {
   id: string;
@@ -14,11 +16,36 @@ export interface DownloadPathSource {
   kind: MediaKind;
   url: string;
   author?: string;
+  pageType?: PageType;
+  postId?: string;
+  caption?: string;
+  location?: string;
+  index?: number;
+  publishedAt?: number;
   collectionType?: 'story' | 'highlight' | 'album';
   collectionTitle?: string;
+  outputExtension?: string;
+  sidecar?: 'thumbnail' | 'caption' | 'metadata';
 }
 
+export type DownloadPathSettings = Pick<
+  Settings,
+  'downloadSubfolder' | 'filenameTemplate'
+> &
+  Partial<
+    Pick<
+      Settings,
+      | 'organizeByAccount'
+      | 'organizeByCategory'
+      | 'splitByMediaType'
+    >
+  >;
+
 export function inferExtension(item: DownloadPathSource): string {
+  if (item.outputExtension) {
+    return item.outputExtension.replace(/^\./, '').toLowerCase();
+  }
+
   const fromUrl = extensionFromUrl(item.url);
   if (fromUrl) {
     return fromUrl;
@@ -29,7 +56,7 @@ export function inferExtension(item: DownloadPathSource): string {
 
 export function buildDownloadPath(
   item: DownloadPathSource,
-  settings: Pick<Settings, 'downloadSubfolder' | 'filenameTemplate'>,
+  settings: DownloadPathSettings,
 ): string {
   const extension = inferExtension(item);
   const subfolder = sanitizeSubfolder(settings.downloadSubfolder);
@@ -41,16 +68,22 @@ export function buildDownloadPath(
   const rendered = renderFilenameTemplate(template, {
     platform: item.platform,
     author: item.author,
+    mediaId: item.postId,
+    index: item.index,
+    caption: item.caption,
+    location: item.location,
     id: shortId,
     kind: item.kind,
+    mediaType: item.kind,
     ext: extension,
-    date: new Date(),
+    date: new Date(item.publishedAt ?? Date.now()),
   });
 
-  const collection =
-    item.collectionType === 'highlight' && item.collectionTitle
-      ? `highlights/${sanitizeSubfolder(item.collectionTitle)}/`
-      : '';
+  const folders = buildFolderSegments(item, {
+    organizeByAccount: settings.organizeByAccount,
+    organizeByCategory: settings.organizeByCategory,
+    splitByMediaType: settings.splitByMediaType,
+  });
 
-  return `${subfolder}/${item.platform}/${collection}${ensureFileExtension(rendered, extension)}`;
+  return `${subfolder}/${folders.join('/')}/${ensureFileExtension(rendered, extension)}`;
 }

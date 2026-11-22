@@ -1,3 +1,4 @@
+import type { DownloadOutputInfo } from './download';
 import type { MediaItem } from './media';
 import type { PlatformId } from './platform';
 
@@ -19,6 +20,7 @@ export interface HistoryEntry {
   totalBytes?: number;
   paused?: boolean;
   error?: string;
+  output?: DownloadOutputInfo;
   createdAt: number;
   updatedAt: number;
 }

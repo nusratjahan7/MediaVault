@@ -46,6 +46,7 @@ function toPreviewItem(entry: HistoryEntry): QueuePreviewItem {
     paused: entry.paused,
     thumbnailUrl: entry.item.thumbnailUrl,
     sizeLabel,
+    outputLabel: entry.output?.label,
     error: entry.error,
     createdAt: entry.createdAt,
   };

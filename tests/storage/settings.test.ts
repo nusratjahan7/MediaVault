@@ -94,6 +94,78 @@ describe('settings storage', () => {
     expect((await getSettings(true)).skipDownloaded).toBe(true);
   });
 
+  it('defaults folder organization, saved templates, and format preferences', async () => {
+    const settings = await getSettings();
+
+    expect(settings.organizeByAccount).toBe(false);
+    expect(settings.organizeByCategory).toBe(true);
+    expect(settings.splitByMediaType).toBe(false);
+    expect(settings.selectedFilenameTemplateId).toBe('default');
+    expect(settings.filenameTemplates.length).toBeGreaterThan(0);
+    expect(settings.imageFormat).toBe('original');
+    expect(settings.videoQuality).toBe('highest');
+    expect(settings.downloadThumbnails).toBe(false);
+    expect(settings.saveCaption).toBe(false);
+    expect(settings.saveMetadata).toBe(false);
+  });
+
+  it('persists reusable filename templates and selected template', async () => {
+    const saved = await saveSettings({
+      filenameTemplates: [
+        {
+          id: 'caption',
+          name: 'Caption',
+          template: '{date}-{username}-{caption}',
+        },
+      ],
+      selectedFilenameTemplateId: 'caption',
+      filenameTemplate: '{date}-{username}-{caption}',
+      organizeByAccount: true,
+      splitByMediaType: true,
+      imageFormat: 'webp',
+      videoQuality: 'source',
+      saveCaption: true,
+      saveMetadata: true,
+      downloadThumbnails: true,
+    });
+
+    expect(saved.selectedFilenameTemplateId).toBe('caption');
+    expect(saved.filenameTemplates).toHaveLength(1);
+    expect(saved.organizeByAccount).toBe(true);
+    expect(saved.imageFormat).toBe('webp');
+    expect(saved.videoQuality).toBe('source');
+    expect(saved.saveCaption).toBe(true);
+    expect(saved.saveMetadata).toBe(true);
+    expect(saved.downloadThumbnails).toBe(true);
+  });
+
+  it('repairs invalid template libraries and format values', async () => {
+    await chrome.storage.local.set({
+      [SETTINGS_STORAGE_KEY]: {
+        version: 1,
+        data: {
+          filenameTemplates: [
+            { id: 'ok', name: '  OK  ', template: '{platform}' },
+            { id: 'ok', name: 'Duplicate', template: '{id}' },
+            { id: 'bad', name: '', template: '{id}' },
+          ],
+          selectedFilenameTemplateId: 'missing',
+          imageFormat: 'gif',
+          videoQuality: '8k',
+        },
+      },
+    });
+
+    const settings = await getSettings(true);
+
+    expect(settings.filenameTemplates).toEqual([
+      { id: 'ok', name: 'OK', template: '{platform}' },
+    ]);
+    expect(settings.selectedFilenameTemplateId).toBeUndefined();
+    expect(settings.imageFormat).toBe('original');
+    expect(settings.videoQuality).toBe('highest');
+  });
+
   it('clamps download concurrency to the supported range', async () => {
     expect((await getSettings()).downloadConcurrency).toBe(2);
     expect((await saveSettings({ downloadConcurrency: 9 })).downloadConcurrency).toBe(3);

@@ -12,6 +12,15 @@ export const SITES_STORAGE_KEY = 'mediavault:sites:v1';
 export const PREVIEW_ACCOUNTS_STORAGE_KEY = 'mediavault:preview:accounts:v1';
 export const SETTINGS_SCHEMA_VERSION = 1;
 
+export const MEDIA_PROCESSING_ORIGINS = [
+  'https://*.cdninstagram.com/*',
+  'https://*.fbcdn.net/*',
+  'https://*.tiktokcdn.com/*',
+  'https://*.tiktokcdn-us.com/*',
+  'https://*.tiktokcdn-eu.com/*',
+  'https://*.ibytedtos.com/*',
+];
+
 export const CONTENT_SCRIPT_FILE = 'content.js';
 export const CONTENT_SCRIPT_ID_PREFIX = 'mediavault-content-';
 

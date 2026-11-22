@@ -60,7 +60,7 @@ describe('download queue', () => {
 
     expect(options?.url).toBe(ITEM.url);
     expect(options?.filename).toMatch(
-      /^MediaVault\/instagram\/instagram-studio-[0-9a-f]{8}\.mp4$/,
+      /^MediaVault\/instagram\/videos\/instagram-studio-[0-9a-f]{8}\.mp4$/,
     );
     expect(options?.conflictAction).toBe('uniquify');
     expect(options?.saveAs).toBe(false);

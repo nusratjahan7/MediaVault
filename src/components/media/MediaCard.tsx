@@ -3,6 +3,7 @@ import { Check, Image as ImageIcon, Lock, Play } from 'lucide-react';
 import type { MediaItem } from '@/types/media';
 import { cn } from '@/utils/cn';
 import { formatDuration } from '@/utils/format';
+import { sourceFormatLabel } from '@/utils/format-label';
 import { Badge } from '../ui/Badge';
 
 export interface MediaCardProps {
@@ -23,6 +24,7 @@ export function MediaCard({
   const duration = formatDuration(item.durationSeconds);
   const dimensions =
     item.width && item.height ? `${item.width}×${item.height}` : undefined;
+  const formatLabel = sourceFormatLabel(item.formats?.[0]);
 
   return (
     <button
@@ -122,8 +124,11 @@ export function MediaCard({
         <span className="truncate text-xs font-medium text-fg">
           {item.author ? `@${item.author.replace(/^@/, '')}` : item.filenameHint ?? item.kind}
         </span>
-        <span className="shrink-0 text-[10px] tracking-wide text-muted uppercase">
-          {item.kind}
+        <span
+          className="shrink-0 text-[10px] tracking-wide text-muted uppercase"
+          title={formatLabel ?? item.kind}
+        >
+          {formatLabel ?? item.kind}
         </span>
       </div>
     </button>

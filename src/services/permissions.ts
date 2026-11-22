@@ -1,4 +1,8 @@
-import { PLATFORM_IDS, PLATFORM_META } from '@/constants';
+import {
+  MEDIA_PROCESSING_ORIGINS,
+  PLATFORM_IDS,
+  PLATFORM_META,
+} from '@/constants';
 import type { PlatformId, SiteStatus } from '@/types/platform';
 import { AppError, fromErrorPayload } from '@/utils/errors';
 import { sendToBackground } from './messaging';
@@ -8,6 +12,22 @@ export async function hasSitePermission(platform: PlatformId): Promise<boolean> 
     return await chrome.permissions.contains({
       origins: PLATFORM_META[platform].originPatterns,
     });
+  } catch {
+    return false;
+  }
+}
+
+export async function hasMediaProcessingAccess(): Promise<boolean> {
+  try {
+    return await chrome.permissions.contains({ origins: MEDIA_PROCESSING_ORIGINS });
+  } catch {
+    return false;
+  }
+}
+
+export async function requestMediaProcessingAccess(): Promise<boolean> {
+  try {
+    return await chrome.permissions.request({ origins: MEDIA_PROCESSING_ORIGINS });
   } catch {
     return false;
   }
