@@ -55,6 +55,18 @@ export interface HistoryClearRequest {
   type: 'HISTORY_CLEAR';
 }
 
+export interface DownloadStatusRequest {
+  type: 'DOWNLOAD_STATUS';
+  ids: string[];
+}
+
+export interface DownloadStatusItem {
+  id: string;
+  state: string;
+  filename?: string;
+  error?: string;
+}
+
 export interface DashboardQueryRequest {
   type: 'DASHBOARD_QUERY';
 }
@@ -88,6 +100,7 @@ export type BackgroundRequest =
   | HistoryQueryRequest
   | HistoryDeleteRequest
   | HistoryClearRequest
+  | DownloadStatusRequest
   | DashboardQueryRequest
   | DashboardClearCompletedRequest
   | SitesStatusRequest
@@ -104,6 +117,7 @@ export interface BackgroundPayloadMap {
   HISTORY_QUERY: HistoryPage;
   HISTORY_DELETE: { deleted: boolean };
   HISTORY_CLEAR: { cleared: number };
+  DOWNLOAD_STATUS: { statuses: DownloadStatusItem[] };
   DASHBOARD_QUERY: DashboardSnapshot;
   DASHBOARD_CLEAR_COMPLETED: { cleared: number };
   SITES_STATUS: SiteStatus[];

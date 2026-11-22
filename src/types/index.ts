@@ -1,6 +1,7 @@
 export * from './dashboard';
 export * from './download';
 export * from './history';
+export * from './in-page';
 export * from './lists';
 export * from './media';
 export * from './messages';

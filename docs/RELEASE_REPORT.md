@@ -10,6 +10,8 @@
 - Image format conversion (local), highest exposed video source, thumbnail/caption/metadata sidecars, actual output reporting.
 - Advanced settings: new-media memory, auto-retry, bulk confirmation, notifications, automatic history clearing, Reset settings, Reset everything.
 - Download dashboard: active/completed/failed/cancelled counts, known sizes only, per-file tiles, thumbnails/account/filename/status/error, queue progress, retry/cancel/open, clear completed.
+- Native shadow-DOM download buttons for Instagram posts/Reels/stories/profile pictures/profile grids, Facebook posts/Reels/stories/albums, and TikTok videos/stories/profile grids, with detecting/downloading/completed/failed states.
+- Direct media URL validation and Instagram embedded direct-video resolution; page URLs, manifests, and blob-only streams are rejected rather than mislabeled.
 - Saved lists and sequential manual profile workflow; strict JSON import/export.
 - Relationship CSV/JSON export from visible rows or official data exports, filtering/field selection.
 - Privacy status, permission overview, local-data clearing, and honest Ghost Mode section.
@@ -21,7 +23,7 @@
 
 - Strict TypeScript.
 - ESLint with zero warnings/errors.
-- 234 tests across 43 files.
+- 249 tests across 46 files.
 - Security audit: manifest allowlist, CSP, optional-origin allowlist, no static content scripts, no eval/new Function/dangerous HTML/cookies.
 - Production pages/content builds and `verify:dist` (15 entry files).
 - Unit/integration coverage includes adapters, formats, download service, browser-confirmed completion, retries, cancellation, notifications, sidecars, folder/filename, settings validation, imports/exports, dashboard, privacy, routers, and UI.
@@ -35,15 +37,18 @@ Verified:
 - unpacked extension installed successfully;
 - `popup.html`, `sidepanel.html`, `options.html`, `dashboard.html`, `history.html`, `stories.html`, `accounts.html`, and `relationships.html` rendered their expected headings;
 - zero runtime/log exceptions on all eight pages;
-- a real localhost media URL was queued through typed background messaging;
-- Chrome reported the download complete;
-- the file was written to `MediaVault/instagram/posts/instagram-smoke-chrome_smoke_1.jpg` under Downloads with 34 bytes;
-- test file and test history entry were removed afterward.
+- a real localhost image was queued through typed background messaging and completed;
+- a real localhost `.mp4` was queued as a video and completed;
+- Chrome reported both downloads complete;
+- files were written under the expected `MediaVault/instagram/...` paths with matching byte counts;
+- test files and history entries were removed afterward.
+- Native platform button behavior was validated with fixture DOM tests, not authenticated live platform pages.
 
 ### Not tested live
 
 - Real Instagram/Facebook/TikTok pages with authenticated sessions.
-- Platform DOM selectors against current production markup.
+- Native button placement against current production platform markup.
+- Real video audio verification from a platform source.
 - Real bulk queue/cancel/retry interaction in Chrome.
 - Popup/sidepanel click-through interactions in Chrome.
 - Extension reload/restart persistence in Chrome.

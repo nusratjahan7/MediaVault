@@ -1,10 +1,9 @@
 import { getAdapterForUrl } from '@/adapters/registry';
-import {
-  findInstagramActionTargets,
-  type InstagramActionTarget,
-} from '@/adapters/instagram/in-page';
+import { findInPageTargets } from '@/content/buttons/find-targets';
+import { selectItemsForTarget } from '@/content/buttons/media-selection';
 import { sendToBackground } from '@/services/messaging';
 import { getSettings, subscribeToSettings } from '@/storage/settings';
+import type { InPageActionTarget } from '@/types/in-page';
 import type { ContentResponse } from '@/types/messages';
 import type { MediaItem, ScanResult } from '@/types/media';
 import { toErrorPayload } from '@/utils/errors';
@@ -14,6 +13,8 @@ import { startSpaObserver } from './observer';
 import { scanPage } from './scanner';
 
 const CACHE_TTL_MS = 2_000;
+const DOWNLOAD_POLL_MS = 1_200;
+const DOWNLOAD_WAIT_MS = 180_000;
 
 let cachedScan: { href: string; at: number; result: ScanResult } | null = null;
 let inPageActions: InPageActionsController | null = null;
@@ -26,11 +27,16 @@ function isScanRequest(message: unknown): boolean {
   );
 }
 
-function getScanResult(): ScanResult {
+function getScanResult(force = false): ScanResult {
   const href = window.location.href;
   const now = Date.now();
 
-  if (cachedScan && cachedScan.href === href && now - cachedScan.at < CACHE_TTL_MS) {
+  if (
+    !force &&
+    cachedScan &&
+    cachedScan.href === href &&
+    now - cachedScan.at < CACHE_TTL_MS
+  ) {
     return cachedScan.result;
   }
 
@@ -39,60 +45,99 @@ function getScanResult(): ScanResult {
   return result;
 }
 
-function matchesTarget(item: MediaItem, target: InstagramActionTarget): boolean {
-  if (!target.postUrl) {
-    return false;
-  }
-
-  if (item.postUrl === target.postUrl) {
-    return true;
-  }
-
-  if (!item.postId) {
-    return false;
-  }
-
-  try {
-    return new URL(target.postUrl).pathname.includes(item.postId);
-  } catch {
-    return false;
-  }
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function selectItemsForTarget(
-  items: MediaItem[],
-  target: InstagramActionTarget,
-): MediaItem[] {
-  if (target.kind === 'story') {
+function currentTargets(): InPageActionTarget[] {
+  return findInPageTargets(document, new URL(window.location.href));
+}
+
+function currentTargetCount(target: InPageActionTarget): number {
+  return currentTargets().filter((candidate) => candidate.platform === target.platform)
+    .length;
+}
+
+async function selectCandidates(target: InPageActionTarget): Promise<MediaItem[]> {
+  let result = getScanResult(true);
+  let items = selectItemsForTarget(target, result.items, currentTargetCount(target));
+
+  if (items.some((item) => item.downloadable)) {
     return items;
   }
 
-  const matched = target.postUrl
-    ? items.filter((item) => matchesTarget(item, target))
-    : [];
+  // Video sources and embedded page data can appear a moment after the button.
+  await delay(350);
+  result = getScanResult(true);
+  items = selectItemsForTarget(target, result.items, currentTargetCount(target));
+  return items;
+}
 
-  if (matched.length > 0) {
-    return matched;
+interface DownloadWaitResult {
+  completed: number;
+  failed: number;
+  cancelled: number;
+  timedOut: boolean;
+  firstError?: string;
+}
+
+async function waitForDownloadJobs(ids: string[]): Promise<DownloadWaitResult> {
+  const deadline = Date.now() + DOWNLOAD_WAIT_MS;
+  let completed = 0;
+  let failed = 0;
+  let cancelled = 0;
+  let firstError: string | undefined;
+
+  while (Date.now() < deadline) {
+    const response = await sendToBackground({ type: 'DOWNLOAD_STATUS', ids });
+    if (!response.ok) {
+      throw new Error(response.error.message);
+    }
+
+    completed = 0;
+    failed = 0;
+    cancelled = 0;
+    firstError = undefined;
+    let terminal = 0;
+
+    for (const status of response.data.statuses) {
+      if (status.state === 'completed') {
+        completed += 1;
+        terminal += 1;
+      } else if (status.state === 'failed') {
+        failed += 1;
+        terminal += 1;
+        firstError ??= status.error;
+      } else if (status.state === 'cancelled') {
+        cancelled += 1;
+        terminal += 1;
+      }
+    }
+
+    if (terminal === ids.length) {
+      return { completed, failed, cancelled, timedOut: false, firstError };
+    }
+
+    await delay(DOWNLOAD_POLL_MS);
   }
 
-  // Single-post pages do not always expose a /p/ link inside the article.
-  if (target.kind === 'post' && document.querySelectorAll('article').length <= 1) {
-    return items;
-  }
-
-  return [];
+  return { completed, failed, cancelled, timedOut: true, firstError };
 }
 
 async function downloadTarget(
-  target: InstagramActionTarget,
+  target: InPageActionTarget,
+  setPhase: (phase: 'detecting' | 'downloading') => void,
 ): Promise<{ message: string; tone: 'success' | 'error' | 'info' }> {
-  const discovery = getScanResult();
-  const candidates = selectItemsForTarget(discovery.items, target);
+  setPhase('detecting');
+  const candidates = await selectCandidates(target);
   const downloadable = candidates.filter((item) => item.downloadable);
 
   if (candidates.length === 0) {
     return {
-      message: 'No accessible media was found for this post.',
+      message:
+        target.kind === 'profile-picture'
+          ? 'No accessible profile picture was found.'
+          : 'No accessible media was found for this post or story.',
       tone: 'error',
     };
   }
@@ -117,35 +162,57 @@ async function downloadTarget(
 
   const { accepted, skipped, alreadyDownloaded } = response.data;
 
-  if (accepted.length > 0) {
+  if (accepted.length === 0) {
+    if (alreadyDownloaded > 0) {
+      return {
+        message: 'Already downloaded — duplicate protection is enabled.',
+        tone: 'info',
+      };
+    }
+
     return {
       message:
-        target.kind === 'grid'
-          ? `Added ${accepted.length} grid ${
-              accepted.length === 1 ? 'image' : 'images'
-            } to downloads. Open the post for original media.`
-          : `Added ${accepted.length} ${
-              accepted.length === 1 ? 'item' : 'items'
-            } to downloads.`,
-      tone: 'success',
+        skipped > 0
+          ? 'No direct downloadable media was found for this item.'
+          : 'Nothing to download.',
+      tone: skipped > 0 ? 'error' : 'info',
     };
   }
 
-  if (alreadyDownloaded > 0) {
+  setPhase('downloading');
+  const result = await waitForDownloadJobs(accepted.map((job) => job.id));
+
+  if (result.timedOut) {
     return {
-      message: 'Already downloaded — Skip Downloaded is enabled.',
+      message: 'Downloads are still running. Track them in the dashboard.',
       tone: 'info',
     };
   }
 
-  if (skipped > 0) {
+  if (result.failed > 0 || result.cancelled > 0) {
     return {
-      message: 'No direct downloadable media was found for this post.',
+      message:
+        result.firstError ??
+        `${result.failed + result.cancelled} download${
+          result.failed + result.cancelled === 1 ? '' : 's'
+        } did not complete. Try again while the page is open.`,
       tone: 'error',
     };
   }
 
-  return { message: 'Nothing to download.', tone: 'info' };
+  const noun =
+    target.kind === 'story'
+      ? result.completed === 1
+        ? 'story'
+        : 'stories'
+      : result.completed === 1
+        ? 'item'
+        : 'items';
+
+  return {
+    message: `Saved ${result.completed} ${noun}.`,
+    tone: 'success',
+  };
 }
 
 async function initInPageActions(): Promise<void> {
@@ -160,13 +227,12 @@ async function initInPageActions(): Promise<void> {
       return;
     }
 
-    if (getAdapterForUrl(new URL(window.location.href))?.id !== 'instagram') {
+    if (!getAdapterForUrl(new URL(window.location.href))) {
       return;
     }
 
     inPageActions = startInPageActions({
-      findTargets: () =>
-        findInstagramActionTargets(document, new URL(window.location.href)),
+      findTargets: currentTargets,
       onDownload: downloadTarget,
     });
 

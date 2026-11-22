@@ -38,6 +38,8 @@ Module 20 (Security & Privacy Audit) is complete with an explicit CSP, permissio
 
 Module 21 (Production Release) is prepared as 1.0.0 with production build, ZIP, docs, and a real-Chrome smoke test.
 
+Native download buttons now cover Instagram, Facebook, and TikTok through platform-specific target finders, a shared shadow-DOM button controller, scoped media selection, and Chrome-confirmed status polling. Direct-video validation and embedded Instagram video resolution prevent page URLs/manifests from being saved as `.mp4`.
+
 ## 2. Runtime topology
 
 ```
@@ -91,7 +93,7 @@ Module 21 (Production Release) is prepared as 1.0.0 with production build, ZIP, 
 | Path | Responsibility |
 | --- | --- |
 | `src/background/` | Service-worker bootstrap, message router, request handlers, site registration |
-| `src/content/` | Injected scanner lifecycle, SPA invalidation, scan response, isolated in-page download overlay |
+| `src/content/` | Scanner lifecycle, SPA invalidation, platform button registry/controller, isolated shadow-DOM actions |
 | `src/popup/` | Page/account context, permission gate, actions, selection mode, queue preview, scan results |
 | `src/options/` | Settings sections, UI preview mode, local data controls |
 | `src/sidepanel/` | Library and Queue views with history/stories/account/settings links |
@@ -105,7 +107,7 @@ Module 21 (Production Release) is prepared as 1.0.0 with production build, ZIP, 
 | `src/mocks/` | UI-only sample data and preview preferences; never imports download services |
 | `src/services/` | Messaging, permissions, tabs, scan orchestration, centralized error boundary, page navigation |
 | `src/adapters/` | Platform URL matching/extraction + shared DOM helpers |
-| `src/downloads/` | `DownloadService` engine, Chrome Downloads client, folder rules, filename/output resolution, sidecars, queue facade |
+| `src/downloads/` | `DownloadService`, media-URL resolver, Chrome client, folder/filename/output, sidecars, queue facade |
 | `src/storage/` | Settings/sites/lists/download-memory in `chrome.storage.local`; workflow/selection in session; history in IndexedDB |
 | `src/types/` | Strict contracts, messages, saved lists, relationship entries, UI contracts |
 | `src/utils/` | URL, filename/templates, format labels, profile validation, relationship CSV/JSON, files, ID, errors |
@@ -356,7 +358,7 @@ npm run build
 
 - Strict TypeScript across `src/` and build configs.
 - ESLint 9 with React hooks rules.
-- Vitest (234 tests): platform/page/account detection, metadata parsing, formats/options, blobs/restrictions, story/highlight and relationship discovery, saved lists/import workflows, advanced settings, new-media memory, automatic retry, notifications, automatic history clearing, dashboard stats/tiles/actions, bulk confirmation, folder/filename rules, image conversion/fallback, sidecars, output reporting, download service lifecycle/retry/cancel/Save As/duplicates, queue controls, storage, messages/payload validation, permissions, router, popup, privacy UI, demo isolation, history, accounts, and previews.
+- Vitest (249 tests): platform/page/account detection, metadata parsing, formats/options, blobs/restrictions, story/highlight and relationship discovery, saved lists/import workflows, advanced settings, new-media memory, automatic retry, notifications, automatic history clearing, dashboard stats/tiles/actions, bulk confirmation, folder/filename rules, image conversion/fallback, sidecars, output reporting, download service lifecycle/retry/cancel/Save As/duplicates, queue controls, storage, messages/payload validation, permissions, router, popup, privacy UI, demo isolation, history, accounts, and previews.
 - Real Chrome 157 headless smoke via ChromeDriver/WebDriver BiDi: extension installed, all eight pages rendered with zero runtime errors, and one localhost download completed through the background service worker and Chrome Downloads API.
 - `verify-dist.mjs` checks the built package as Chrome would consume it, including all eight HTML surfaces.
 - `security-audit.mjs` checks permission allowlists, self-only CSP, optional origins, no static content scripts, and risky-source patterns.

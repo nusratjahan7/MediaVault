@@ -112,6 +112,23 @@ describe('background message router', () => {
     });
   });
 
+  it('returns download status records and validates status ids', async () => {
+    const response = await dispatch({
+      type: 'DOWNLOAD_STATUS',
+      ids: ['missing-download'],
+    });
+
+    expect(response).toEqual({
+      ok: true,
+      data: { statuses: [{ id: 'missing-download', state: 'unknown' }] },
+    });
+
+    await expect(dispatch({ type: 'DOWNLOAD_STATUS', ids: [] })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_INPUT' },
+    });
+  });
+
   it('returns a dashboard snapshot through the typed route', async () => {
     const response = await dispatch({ type: 'DASHBOARD_QUERY' });
 

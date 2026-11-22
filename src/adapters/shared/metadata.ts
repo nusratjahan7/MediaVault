@@ -7,6 +7,10 @@ import type { AccountIdentity, PageType } from '@/types/page';
 import type { PlatformId } from '@/types/platform';
 import { createMediaId } from '@/utils/id';
 import { extensionFromUrl, isHttpUrl, normalizeHttpUrl } from '@/utils/url';
+import {
+  invalidMediaReason,
+  isLikelyMediaUrl,
+} from '@/downloads/media-resolver';
 import type { ExtractContext } from '../types';
 import { metaContent, ogContent } from './dom';
 
@@ -104,7 +108,7 @@ export function postIdFromUrl(platform: PlatformId, url: URL): string | undefine
 }
 
 export function inferFormats(item: MediaItem): MediaFormat[] {
-  if (!item.downloadable || !isHttpUrl(item.url)) {
+  if (!item.downloadable || !isLikelyMediaUrl(item.url, item.kind)) {
     return [];
   }
 
@@ -133,6 +137,9 @@ function normalizeFormats(
 
   for (const format of source) {
     const url = format.url ? normalizeHttpUrl(format.url) ?? undefined : undefined;
+    if (!url || !isLikelyMediaUrl(url, format.kind ?? item.kind)) {
+      continue;
+    }
     const extension =
       format.extension || extensionFromUrl(url) || (item.kind === 'video' ? 'mp4' : 'jpg');
     const key = `${url ?? 'none'}:${extension}`;
@@ -163,7 +170,8 @@ export function enrichMediaItem(
   pageType: PageType,
   blocking: boolean,
 ): MediaItem {
-  const downloadable = !blocking && item.downloadable && isHttpUrl(item.url);
+  const validDirectUrl = isLikelyMediaUrl(item.url, item.kind);
+  const downloadable = !blocking && item.downloadable && validDirectUrl;
   const formats = downloadable ? normalizeFormats(item.formats, item) : [];
   const postId = item.postId ?? postIdFromUrl(platform, context.url);
   const sourcePageUrl =
@@ -185,7 +193,9 @@ export function enrichMediaItem(
     downloadable,
     unsupportedReason: blocking
       ? 'Restricted content — MediaVault does not bypass access controls.'
-      : item.unsupportedReason,
+      : item.downloadable && !validDirectUrl
+        ? invalidMediaReason(item.kind)
+        : item.unsupportedReason,
     downloadStatus: blocking
       ? 'restricted'
       : item.downloadStatus ?? (downloadable ? 'available' : 'unsupported'),
@@ -202,7 +212,7 @@ export function buildDownloadOptions(item: MediaItem): DownloadOption[] {
   }
 
   const formats = normalizeFormats(item.formats, item).filter(
-    (format) => Boolean(format.url) && isHttpUrl(format.url),
+    (format) => Boolean(format.url) && isLikelyMediaUrl(format.url, format.kind),
   );
 
   const fallback = formats.length > 0 ? formats : inferFormats(item);

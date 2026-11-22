@@ -5,6 +5,7 @@ import { AppError } from '@/utils/errors';
 import {
   handleCancelDownload,
   handleDownloadItems,
+  handleDownloadStatus,
   handlePauseDownload,
   handleResumeDownload,
   handleRetryDownload,
@@ -24,6 +25,7 @@ import { getSitesStatus, registerSite, unregisterSite } from './handlers/sites';
 const REQUEST_TYPES = new Set<string>([
   'SCAN_TAB',
   'DOWNLOAD_ITEMS',
+  'DOWNLOAD_STATUS',
   'CANCEL_DOWNLOAD',
   'RETRY_DOWNLOAD',
   'PAUSE_DOWNLOAD',
@@ -91,6 +93,16 @@ function validateRequest(request: BackgroundRequest): void {
         }
       }
       return;
+    case 'DOWNLOAD_STATUS':
+      if (
+        !Array.isArray(request.ids) ||
+        request.ids.length === 0 ||
+        request.ids.length > MAX_SCAN_ITEMS ||
+        request.ids.some((id) => !validId(id))
+      ) {
+        fail('A valid download status selection is required.');
+      }
+      return;
     case 'CANCEL_DOWNLOAD':
     case 'RETRY_DOWNLOAD':
     case 'PAUSE_DOWNLOAD':
@@ -142,6 +154,8 @@ async function dispatch(request: BackgroundRequest): Promise<ApiResponse<unknown
         return handleScanTab(request);
       case 'DOWNLOAD_ITEMS':
         return handleDownloadItems(request);
+      case 'DOWNLOAD_STATUS':
+        return handleDownloadStatus(request);
       case 'CANCEL_DOWNLOAD':
         return handleCancelDownload(request);
       case 'RETRY_DOWNLOAD':

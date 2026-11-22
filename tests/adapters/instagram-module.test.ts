@@ -51,13 +51,18 @@ describe('Instagram module discovery', () => {
     const url = new URL('https://www.instagram.com/studio.north/');
     const targets = findInstagramActionTargets(document, url);
 
-    expect(targets).toHaveLength(2);
-    expect(targets.map((target) => target.kind)).toEqual(['grid', 'grid']);
-    expect(targets.map((target) => target.postUrl)).toEqual([
+    expect(targets).toHaveLength(3);
+    expect(targets.map((target) => target.kind)).toEqual([
+      'profile-picture',
+      'grid',
+      'grid',
+    ]);
+    expect(targets.slice(1).map((target) => target.postUrl)).toEqual([
       'https://www.instagram.com/p/ABC123/',
       'https://www.instagram.com/reel/REEL9/',
     ]);
-    expect(targets[0]?.position).toBe('overlay');
+    expect(targets[0]?.position).toBe('after');
+    expect(targets[1]?.position).toBe('overlay');
   });
 
   it('discovers story media with direct URLs and reports blob-only video', () => {

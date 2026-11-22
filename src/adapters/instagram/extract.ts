@@ -1,8 +1,10 @@
 import { MIN_IMAGE_SIZE } from '@/constants';
-import type { MediaItem, ScanLimitation } from '@/types/media';
+import type { MediaFormat, MediaItem, ScanLimitation } from '@/types/media';
+import { isLikelyMediaUrl } from '@/downloads/media-resolver';
 import { normalizeHttpUrl } from '@/utils/url';
 import type { ExtractContext, ExtractResult } from '../types';
 import { identifyInstagramAccount } from './account';
+import { findInstagramEmbeddedVideos } from './embedded-video';
 import { detectInstagramPageType } from './page-type';
 import {
   addLimitation,
@@ -37,6 +39,39 @@ function postMetadata(link: string | undefined, fallback: string) {
   return { postUrl: link, postId: postIdFromUrl('instagram', parsed) };
 }
 
+function instagramVideoFormats(
+  videos: Array<{ url: string; width?: number; height?: number }>,
+): MediaFormat[] {
+  const seen = new Set<string>();
+  const formats: MediaFormat[] = [];
+
+  for (const [index, video] of videos.entries()) {
+    if (seen.has(video.url)) {
+      continue;
+    }
+
+    seen.add(video.url);
+    const resolution =
+      video.width && video.height
+        ? `${Math.min(video.width, video.height)}×${Math.max(video.width, video.height)}`
+        : index === 0
+          ? 'Best exposed source'
+          : 'Alternate source';
+
+    formats.push({
+      id: `instagram-video-${index + 1}`,
+      label: `MP4 · ${resolution}`,
+      extension: 'mp4',
+      mimeType: 'video/mp4',
+      kind: 'video',
+      quality: 'source',
+      url: video.url,
+    });
+  }
+
+  return formats;
+}
+
 export function extractInstagram({ document, url }: ExtractContext): ExtractResult {
   const items: MediaItem[] = [];
   const limitations: ScanLimitation[] = [];
@@ -51,11 +86,35 @@ export function extractInstagram({ document, url }: ExtractContext): ExtractResu
   );
 
   const ogImage = normalizeHttpUrl(ogContent(document, 'og:image'), url.href) ?? undefined;
-  const ogVideo =
+  const rawOgVideo =
     normalizeHttpUrl(
       ogContent(document, 'og:video:secure_url') ?? ogContent(document, 'og:video'),
       url.href,
     ) ?? undefined;
+  const ogVideo =
+    rawOgVideo && isLikelyMediaUrl(rawOgVideo, 'video') ? rawOgVideo : undefined;
+  const canUseEmbeddedVideo =
+    isStoryPage ||
+    pageType === 'reel' ||
+    pageType === 'video' ||
+    Boolean(rawOgVideo) ||
+    Boolean(document.querySelector('article video, main video'));
+  const embeddedVideos = canUseEmbeddedVideo
+    ? findInstagramEmbeddedVideos(document, url)
+    : [];
+  const videoCandidates: Array<{
+    url: string;
+    width?: number;
+    height?: number;
+  }> = [
+    ...(ogVideo ? [{ url: ogVideo }] : []),
+    ...embeddedVideos,
+  ].filter(
+    (video, index, all) =>
+      all.findIndex((candidate) => candidate.url === video.url) === index,
+  );
+  const videoFormats = instagramVideoFormats(videoCandidates);
+  const primaryVideo = videoCandidates[0];
 
   if (pageType === 'profile') {
     const profileImage = document.querySelector<HTMLImageElement>(
@@ -81,13 +140,16 @@ export function extractInstagram({ document, url }: ExtractContext): ExtractResu
     }
   }
 
-  if (ogVideo) {
+  if (primaryVideo) {
     items.push(
-      createMediaItem('instagram', 'video', ogVideo, {
+      createMediaItem('instagram', 'video', primaryVideo.url, {
         thumbnailUrl: ogImage,
+        width: primaryVideo.width,
+        height: primaryVideo.height,
         postUrl,
         author,
         caption,
+        formats: videoFormats,
         filenameHint: 'instagram-video',
       }),
     );
@@ -101,6 +163,15 @@ export function extractInstagram({ document, url }: ExtractContext): ExtractResu
         filenameHint: 'instagram-photo',
       }),
     );
+  }
+
+  if (rawOgVideo && !ogVideo && videoCandidates.length === 0) {
+    addLimitation(limitations, {
+      code: 'unsupported-media',
+      severity: 'warning',
+      message:
+        'Instagram exposed a page link instead of a direct video file. Adaptive/segmented video cannot be saved without a permitted direct source.',
+    });
   }
 
   let linkedGridImages = 0;

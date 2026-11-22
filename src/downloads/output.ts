@@ -11,6 +11,7 @@ import {
 } from '@/services/image-conversion';
 import { formatOutputLabel } from '@/utils/format-label';
 import { extensionFromUrl, isHttpUrl } from '@/utils/url';
+import { isLikelyMediaUrl } from './media-resolver';
 
 export interface PreparedDownloadOutput {
   url: string;
@@ -72,7 +73,10 @@ function baseFormat(
 
   const formats = (source.formats ?? []).filter(
     (format): format is MediaFormat & { url: string } =>
-      Boolean(format.url) && isHttpUrl(format.url ?? '') && format.kind === 'video',
+      Boolean(format.url) &&
+      isHttpUrl(format.url ?? '') &&
+      isLikelyMediaUrl(format.url, 'video') &&
+      format.kind === 'video',
   );
 
   if (formats.length === 0) {

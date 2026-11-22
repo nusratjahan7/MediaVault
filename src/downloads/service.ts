@@ -33,6 +33,7 @@ import { createId } from '@/utils/id';
 import { logger } from '@/utils/logger';
 import { isHttpUrl } from '@/utils/url';
 import { sanitizeDownloadPath } from '@/utils/filename';
+import { isLikelyMediaUrl } from './media-resolver';
 import {
   cancelDownload,
   describeDownloadError,
@@ -233,7 +234,7 @@ function sourceIsDownloadable(source: DownloadSource): boolean {
 
   const supportedUrl = source.sidecar
     ? source.url.startsWith('data:') || isHttpUrl(source.url)
-    : isHttpUrl(source.url);
+    : isLikelyMediaUrl(source.url, source.kind);
 
   if (!supportedUrl) {
     return false;

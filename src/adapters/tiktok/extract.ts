@@ -1,4 +1,5 @@
 import type { MediaFormat, MediaItem, ScanLimitation } from '@/types/media';
+import { isLikelyMediaUrl } from '@/downloads/media-resolver';
 import { normalizeHttpUrl } from '@/utils/url';
 import type { ExtractContext, ExtractResult } from '../types';
 import { identifyTikTokAccount } from './account';
@@ -84,7 +85,7 @@ function videoFormats(
 ): MediaFormat[] {
   const formats: MediaFormat[] = [];
 
-  if (playbackUrl) {
+  if (playbackUrl && isLikelyMediaUrl(playbackUrl, 'video')) {
     formats.push({
       id: 'tiktok-playback',
       label: 'MP4 · Playback',
@@ -96,7 +97,11 @@ function videoFormats(
     });
   }
 
-  if (downloadUrl && downloadUrl !== playbackUrl) {
+  if (
+    downloadUrl &&
+    downloadUrl !== playbackUrl &&
+    isLikelyMediaUrl(downloadUrl, 'video')
+  ) {
     formats.push({
       id: 'tiktok-download',
       label: 'MP4 · Download copy',
@@ -171,7 +176,12 @@ export function extractTikTok({ document, url }: ExtractContext): ExtractResult 
 
     const playbackUrl = normalizeHttpUrl(item.videoUrl, url.href) ?? undefined;
     const downloadUrl = normalizeHttpUrl(item.downloadUrl, url.href) ?? undefined;
-    const videoUrl = playbackUrl ?? downloadUrl;
+    const videoUrl =
+      playbackUrl && isLikelyMediaUrl(playbackUrl, 'video')
+        ? playbackUrl
+        : downloadUrl && isLikelyMediaUrl(downloadUrl, 'video')
+          ? downloadUrl
+          : undefined;
     const coverUrl = normalizeHttpUrl(item.coverUrl, url.href) ?? undefined;
     const formats = videoFormats(playbackUrl, downloadUrl);
 

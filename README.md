@@ -10,6 +10,7 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 - [Platform adapters](./docs/ADAPTERS.md) — detection, account identity, metadata, formats, resilience
 - [Download engine](./docs/DOWNLOADS.md) — service API, states, progress, cancellation, retry, folder choice
 - [Download dashboard](./docs/DASHBOARD.md) — stats, queue tiles, retry/cancel/open, known sizes
+- [Native download buttons](./docs/NATIVE_BUTTONS.md) — platform placements, media resolution, video fix, states
 - [Complete settings](./docs/SETTINGS.md) — every persisted preference, defaults, validation, resets
 - [Security audit](./docs/SECURITY_AUDIT.md) — permissions, storage, network, risks, fixes
 - [Installation](./docs/INSTALL.md) — build, load unpacked, ZIP, troubleshooting
@@ -80,7 +81,10 @@ All downloads use Chrome's Downloads API directly. No media is uploaded, proxied
 - Opens completed files with Chrome's supported download action and supports dashboard retry/cancel/clear.
 - Remembers completed media IDs for “Download new media only,” even after history is cleared.
 - Optionally auto-retries failures, confirms bulk actions, and shows opt-in Chrome notifications.
-- Adds Instagram download buttons beside post actions and on accessible profile-grid items.
+- Shows native icon download buttons on Instagram posts, Reels, stories, profile pictures, and profile grids.
+- Shows Facebook post, Reel, story, and album buttons, plus TikTok video/story and profile-grid buttons.
+- Validates direct media URLs before download, rejects page URLs/HLS/DASH/blob-only sources, and resolves embedded Instagram direct video versions.
+- Shows detecting/downloading/completed/failed button states and waits for Chrome-confirmed completion before success feedback.
 - Saves profile pictures, carousel slides, reels, and directly accessible story/highlight media where permitted.
 - Discovers Facebook photos, direct videos, albums, reels, and visible profile/page media.
 - Refuses page-only or adaptive Facebook video instead of pretending a file exists.
@@ -339,6 +343,11 @@ Known limits (also shown in-product):
 46. Notifications are opt-in and may expose filenames to anyone who can see the OS/Chrome notification.
 47. “Open file” requires a completed download and a user click; if Chrome cannot open it, MediaVault falls back to showing the folder.
 48. Live platform E2E remains a release gate; the Chrome smoke test covered extension pages and a real localhost download, not authenticated platform pages.
+49. Native button placement depends on platform action-row/DOM structure; fallback overlays are used when a native row is unavailable.
+50. Blob/adaptive/MSE video, HLS/DASH manifests, DRM, and video/audio streams that require remuxing are unsupported. MediaVault does not merge streams or promise audio when the source is video-only.
+51. Instagram embedded video extraction is limited to a single current post/reel/story surface; feed/video recommendations are not used to target another post.
+52. Profile grids save the media/thumbnail the grid exposes; open the post for original carousel media.
+53. Story/highlight buttons save only the currently displayed media and never auto-download the entire story.
 
 ## Testing and verification
 
@@ -347,11 +356,11 @@ Verified in this repository:
 ```bash
 npm run typecheck   # strict TypeScript, app + configs
 npm run lint        # ESLint, zero warnings/errors
-npm run test:run    # 234 tests passing
+npm run test:run    # 249 tests passing
 npm run build       # loadable dist/ + manifest/package verification
 ```
 
-Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, the download service (pending/downloading/completed/failed/cancelled, browser-confirmed completion, byte progress, pause/resume, cancellation, retry, Save As, duplicates, Skip Downloaded, configurable concurrency, typed history), per-tab selection persistence and bulk UI, queue controls/failure summaries, story/highlight models and expiration, story/highlight manager UI, highlight title folders/covers, saved-list CRUD/import validation/workflow, saved-list UI and confirmation dialogs, visible relationship discovery, official export JSON/CSV parsing, relationship filtering/fields/CSV escaping, relationship page UI, local-only/privacy/permission UI, Ghost Mode copy, advanced settings validation/UI, new-media memory, auto-retry, notifications, automatic history clearing, dashboard stats/tiles/actions, bulk confirmation, folder organization, filename templates/variables/previews, filename sanitization/traversal/length, saved-template settings UI, highest-source video selection, local image-conversion success and fallback, thumbnail/caption/metadata sidecars, actual output reporting, Instagram profile pictures/grid/story targets, in-page overlay injection, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile cards, caption export, filename safety, URL normalization, settings/history/sites storage, typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
+Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, the download service (pending/downloading/completed/failed/cancelled, browser-confirmed completion, byte progress, pause/resume, cancellation, retry, Save As, duplicates, Skip Downloaded, configurable concurrency, typed history), per-tab selection persistence and bulk UI, queue controls/failure summaries, story/highlight models and expiration, story/highlight manager UI, highlight title folders/covers, saved-list CRUD/import validation/workflow, saved-list UI and confirmation dialogs, visible relationship discovery, official export JSON/CSV parsing, relationship filtering/fields/CSV escaping, relationship page UI, local-only/privacy/permission UI, Ghost Mode copy, advanced settings validation/UI, new-media memory, auto-retry, notifications, automatic history clearing, dashboard stats/tiles/actions, bulk confirmation, native button placement/selection/states across all three platforms, direct-video URL resolution, folder organization, filename templates/variables/previews, filename sanitization/traversal/length, saved-template settings UI, highest-source video selection, local image-conversion success and fallback, thumbnail/caption/metadata sidecars, actual output reporting, Instagram profile pictures/grid/story targets, in-page overlay injection, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile cards, caption export, filename safety, URL normalization, settings/history/sites storage, typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
 
 **Verified in real Chrome 157 headless:** via ChromeDriver/WebDriver BiDi, all eight extension pages rendered with zero runtime errors, and one real localhost media URL downloaded through the background service worker and Chrome Downloads API. The test file/history entry were removed afterward.
 
@@ -382,6 +391,9 @@ Coverage includes platform/page/account detection, metadata normalization, forma
 - Highest-source video selection records HD/Source quality and the actual extension in history.
 - Thumbnail, caption, and metadata sidecars appear as separate history entries and use the same folder.
 - Media processing access is requested only from Format & quality when conversion is selected.
+- Native buttons appear once per supported post/story/grid item, survive SPA refreshes, and disappear with their media.
+- Clicking a story button downloads only the displayed story; carousel posts download their rendered accessible items; profile-grid buttons target that item.
+- Direct video URLs are validated; page URLs, manifests, blob-only streams, and separate audio/video streams are reported unsupported rather than mislabeled.
 - Saved lists can be created, renamed, profile-edited, multi-selected, exported/imported with confirmation, and used to open a sequential profile workflow.
 - Malformed saved-list or relationship imports are rejected before saving; no credentials are stored.
 - Followers/following visible rows and official export files produce filtered CSV/JSON with only selected fields.
@@ -389,6 +401,8 @@ Coverage includes platform/page/account detection, metadata normalization, forma
 - Dashboard renders stats/tiles, opens completed files, retries/cancels, and clears completed entries; sizes/progress match Chrome-reported bytes only.
 - Advanced settings persist and apply: new-media memory, retries, bulk confirmation, notifications, auto-clear history, and Reset settings.
 - Chrome smoke test installed the extension, rendered all pages, and completed one real download through the background service worker.
+- Native buttons appear once in the correct platform action area, select the intended item/story/grid media, handle failure/retry states, and remove themselves when media leaves the DOM.
+- Page URLs/manifests are rejected as video sources; embedded Instagram direct video versions resolve correctly in fixtures.
 - Account selection persists and the popup page-context card reflects the chosen mock account.
 - Full history page shows stats, filters, empty state, and clear confirmation.
 - Side panel switches between Library and Queue; header/footer navigation opens history, stories, accounts, export, and settings.

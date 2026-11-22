@@ -4,6 +4,8 @@ import type { EnqueueResult } from '@/types/download';
 import type {
   CancelDownloadRequest,
   DownloadItemsRequest,
+  DownloadStatusItem,
+  DownloadStatusRequest,
   PauseDownloadRequest,
   ResumeDownloadRequest,
   RetryDownloadRequest,
@@ -18,6 +20,28 @@ export async function handleDownloadItems({
   }
 
   return enqueueDownloads(items);
+}
+
+export async function handleDownloadStatus({
+  ids,
+}: DownloadStatusRequest): Promise<{ statuses: DownloadStatusItem[] }> {
+  const statuses = await Promise.all(
+    ids.slice(0, 200).map(async (id): Promise<DownloadStatusItem> => {
+      const record = await downloadService.getStatus(id);
+      if (!record) {
+        return { id, state: 'unknown' };
+      }
+
+      return {
+        id,
+        state: record.state,
+        filename: record.filename,
+        ...(record.error ? { error: record.error } : {}),
+      };
+    }),
+  );
+
+  return { statuses };
 }
 
 export async function handleCancelDownload({

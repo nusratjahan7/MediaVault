@@ -165,7 +165,14 @@ export function extractFacebook({ document, url }: ExtractContext): ExtractResul
     ) ?? normalizeHttpUrl(ogContent(document, 'og:video'), url.href) ?? undefined;
   const directOgVideo =
     rawOgVideo && looksLikeDirectVideoUrl(rawOgVideo) ? rawOgVideo : undefined;
-  const embeddedVideos = findEmbeddedVideoUrls(document, url);
+  const canUsePageEmbeddedVideo =
+    isVideoPage ||
+    pageType === 'story' ||
+    (pageType === 'post' &&
+      (Boolean(rawOgVideo) || Boolean(document.querySelector('video'))));
+  const embeddedVideos = canUsePageEmbeddedVideo
+    ? findEmbeddedVideoUrls(document, url)
+    : [];
   const embeddedFormats = videoFormats(embeddedVideos);
 
   if (directOgVideo) {

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Added native icon download buttons for Instagram posts, Reels, stories, profile pictures, and profile grids.
+- Added Facebook post, Reel, story, and album buttons.
+- Added TikTok current video/story and profile-grid buttons with direct-video/thumbnail fallback.
+- Added direct-video URL validation, embedded Instagram video resolution, manifest/page rejection, and `DOWNLOAD_STATUS` Chrome-confirmed completion feedback.
+- Added duplicate prevention, SPA cleanup, retry/failed states, and scoped media selection.
+
 ## 1.0.0 — 2026-11-22
 
 ### Core

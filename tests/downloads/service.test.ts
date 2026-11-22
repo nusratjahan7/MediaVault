@@ -414,6 +414,23 @@ describe('DownloadService', () => {
     expect(chromeMock.downloads.download).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects platform page URLs instead of saving HTML as a video', async () => {
+    await expect(
+      service.enqueue({
+        ...SOURCE,
+        url: 'https://www.instagram.com/reel/ABC123/',
+      }),
+    ).rejects.toMatchObject({ code: 'DOWNLOAD_FAILED' });
+
+    await expect(
+      service.enqueue({
+        ...SOURCE,
+        url: 'https://www.instagram.com/reel/ABC123/',
+        formats: undefined,
+      }),
+    ).rejects.toMatchObject({ code: 'DOWNLOAD_FAILED' });
+  });
+
   it('rejects sources without a permitted direct URL', async () => {
     await expect(
       service.enqueue({ ...SOURCE, url: 'blob:https://www.instagram.com/1' }),
