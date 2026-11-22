@@ -31,7 +31,9 @@ describe('account selection page', () => {
 
     renderAccounts();
 
-    expect(await screen.findByRole('heading', { name: 'Account selection' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Accounts & lists' })).toBeTruthy();
+    await user.click(screen.getByRole('radio', { name: 'Interface preview' }));
+
     expect(await screen.findByText('UI preview.')).toBeTruthy();
     expect(screen.getByText('3 of 3 platforms configured')).toBeTruthy();
     expect(

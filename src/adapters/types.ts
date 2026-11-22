@@ -5,6 +5,7 @@ import type {
 } from '@/types/media';
 import type { AccountIdentity, PageType, PlatformDetection } from '@/types/page';
 import type { PlatformId } from '@/types/platform';
+import type { RelationshipDiscovery } from '@/types/relationship';
 import type { HighlightMedia, StoryMedia } from '@/types/story';
 
 export interface ExtractContext {
@@ -56,6 +57,9 @@ export interface PlatformAdapter {
     context: ExtractContext,
     discovery: AdapterDiscovery,
   ): HighlightMedia[];
+
+  /** Discover the visible followers/following rows on an authorized page. */
+  discoverRelationships?(context: ExtractContext): RelationshipDiscovery | null;
 
   /** Return the download formats the platform exposes for one item. */
   getDownloadOptions(item: MediaItem): DownloadOption[];

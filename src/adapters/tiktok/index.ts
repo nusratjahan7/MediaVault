@@ -7,6 +7,8 @@ import type { HighlightMedia, StoryMedia } from '@/types/story';
 import { identifyTikTokAccount } from './account';
 import { extractTikTok } from './extract';
 import { detectTikTokPageType } from './page-type';
+import type { RelationshipDiscovery } from '@/types/relationship';
+import { discoverTikTokRelationships } from './relationships';
 import { discoverTikTokHighlights, discoverTikTokStories } from './stories';
 
 export class TikTokAdapter extends BasePlatformAdapter {
@@ -38,6 +40,10 @@ export class TikTokAdapter extends BasePlatformAdapter {
 
   discoverHighlights(): HighlightMedia[] {
     return discoverTikTokHighlights();
+  }
+
+  discoverRelationships(context: ExtractContext): RelationshipDiscovery | null {
+    return discoverTikTokRelationships(context);
   }
 
   protected discoverRawMedia(context: ExtractContext): ExtractResult {

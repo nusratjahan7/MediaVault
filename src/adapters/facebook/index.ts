@@ -7,6 +7,8 @@ import type { HighlightMedia, StoryMedia } from '@/types/story';
 import { identifyFacebookAccount } from './account';
 import { extractFacebook } from './extract';
 import { detectFacebookPageType } from './page-type';
+import type { RelationshipDiscovery } from '@/types/relationship';
+import { discoverFacebookRelationships } from './relationships';
 import {
   discoverFacebookHighlights,
   discoverFacebookStories,
@@ -48,6 +50,10 @@ export class FacebookAdapter extends BasePlatformAdapter {
     },
   ): HighlightMedia[] {
     return discoverFacebookHighlights(context, discovery);
+  }
+
+  discoverRelationships(context: ExtractContext): RelationshipDiscovery | null {
+    return discoverFacebookRelationships(context);
   }
 
   protected discoverRawMedia(context: ExtractContext): ExtractResult {

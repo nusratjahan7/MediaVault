@@ -10,6 +10,11 @@ export const HISTORY_STORE = 'history' as const;
 export const SETTINGS_STORAGE_KEY = 'mediavault:settings:v1';
 export const SITES_STORAGE_KEY = 'mediavault:sites:v1';
 export const PREVIEW_ACCOUNTS_STORAGE_KEY = 'mediavault:preview:accounts:v1';
+export const SAVED_LISTS_STORAGE_KEY = 'mediavault:saved-lists:v1';
+export const PROFILE_WORKFLOW_SESSION_KEY = 'mediavault:profile-workflow:v1';
+export const MAX_SAVED_LISTS = 50;
+export const MAX_SAVED_PROFILES_PER_LIST = 500;
+export const MAX_PROFILE_WORKFLOW_ITEMS = 50;
 export const SETTINGS_SCHEMA_VERSION = 1;
 
 export const MEDIA_PROCESSING_ORIGINS = [

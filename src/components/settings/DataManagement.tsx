@@ -4,12 +4,14 @@ import { PREVIEW_ACCOUNTS_STORAGE_KEY } from '@/constants';
 import { useSettings } from '@/hooks/useSettings';
 import { useToast } from '@/hooks/useToast';
 import { sendToBackground } from '@/services/messaging';
+import { clearSavedLists, stopProfileWorkflow } from '@/storage/lists';
 import { coerceSettings, DEFAULT_SETTINGS } from '@/storage/settings';
 import { fromErrorPayload, getErrorMessage } from '@/utils/errors';
+import { readFileText } from '@/utils/file';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 
-type ConfirmAction = 'history' | 'all' | null;
+type ConfirmAction = 'history' | 'lists' | 'all' | null;
 
 export function DataManagement() {
   const { settings, updateSettings, resetSettings } = useSettings();
@@ -42,16 +44,43 @@ export function DataManagement() {
     }
   };
 
+  const clearLists = async () => {
+    setWorking(true);
+
+    try {
+      await clearSavedLists();
+      await stopProfileWorkflow();
+      toast({
+        title: 'Saved account lists cleared',
+        description: 'All local lists and the active profile workflow were removed.',
+        variant: 'success',
+      });
+    } catch (caught) {
+      toast({
+        title: 'Could not clear saved lists',
+        description: getErrorMessage(caught),
+        variant: 'error',
+      });
+    } finally {
+      setWorking(false);
+      setConfirmAction(null);
+    }
+  };
+
   const clearEverything = async () => {
     setWorking(true);
 
     try {
       await sendToBackground({ type: 'HISTORY_CLEAR' }).catch(() => undefined);
       await chrome.storage.local.remove(PREVIEW_ACCOUNTS_STORAGE_KEY).catch(() => undefined);
+      await clearSavedLists().catch(() => undefined);
+      await stopProfileWorkflow().catch(() => undefined);
+      await chrome.storage.session.clear().catch(() => undefined);
       await resetSettings();
       toast({
         title: 'Local data cleared',
-        description: 'History, settings, and preview selections were reset on this device.',
+        description:
+          'History, saved lists, workflow, selection, settings, and preview selections were reset on this device.',
         variant: 'success',
       });
     } catch (caught) {
@@ -87,7 +116,7 @@ export function DataManagement() {
 
   const importSettings = async (file: File) => {
     try {
-      const parsed: unknown = JSON.parse(await file.text());
+      const parsed: unknown = JSON.parse(await readFileText(file));
       const candidate =
         typeof parsed === 'object' && parsed !== null && 'settings' in parsed
           ? (parsed as { settings: unknown }).settings
@@ -160,6 +189,14 @@ export function DataManagement() {
             Clear history
           </Button>
           <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setConfirmAction('lists')}
+            icon={<Trash2 className="size-3.5" aria-hidden="true" />}
+          >
+            Clear saved lists
+          </Button>
+          <Button
             variant="danger"
             size="sm"
             onClick={() => setConfirmAction('all')}
@@ -188,10 +225,27 @@ export function DataManagement() {
       />
 
       <Modal
+        open={confirmAction === 'lists'}
+        onClose={() => setConfirmAction(null)}
+        title="Clear saved account lists?"
+        description="This removes all local saved lists, profiles, and the active profile workflow. It does not affect platform accounts or downloaded files."
+        footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmAction(null)}>
+              Cancel
+            </Button>
+            <Button variant="danger" size="sm" onClick={clearLists} loading={working}>
+              Clear saved lists
+            </Button>
+          </>
+        }
+      />
+
+      <Modal
         open={confirmAction === 'all'}
         onClose={() => setConfirmAction(null)}
         title="Reset all local data?"
-        description="This clears history and restores default settings (theme, download folder, filename template, history limits). Site access is managed separately. Files already downloaded stay on disk."
+        description="This clears history, saved lists, the active workflow, session selections, and settings. Site access is managed separately. Files already downloaded stay on disk."
         footer={
           <>
             <Button variant="ghost" size="sm" onClick={() => setConfirmAction(null)}>

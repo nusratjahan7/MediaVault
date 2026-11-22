@@ -61,7 +61,12 @@ for (const field of ['name', 'version', 'description', 'minimum_chrome_version']
   }
 }
 
-const extraPages = ['history.html', 'accounts.html', 'stories.html'];
+const extraPages = [
+  'history.html',
+  'accounts.html',
+  'stories.html',
+  'relationships.html',
+];
 const requiredFiles = new Set([
   'manifest.json',
   'content.js',

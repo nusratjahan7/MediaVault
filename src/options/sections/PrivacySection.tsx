@@ -1,6 +1,8 @@
 import { ShieldCheck } from 'lucide-react';
 import { Section } from '@/components/layout/Section';
 import { DataManagement } from '@/components/settings/DataManagement';
+import { PermissionOverview } from '@/components/settings/PermissionOverview';
+import { PrivacyStatus } from '@/components/settings/PrivacyStatus';
 import { Select } from '@/components/ui/Select';
 import { Toggle } from '@/components/ui/Toggle';
 import { useSettings } from '@/hooks/useSettings';
@@ -24,7 +26,9 @@ export function PrivacySection() {
       description="Everything MediaVault stores stays in this browser profile on this device."
     >
       <div className="space-y-5">
-        <div className="flex items-start justify-between gap-4">
+        <PrivacyStatus />
+
+        <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
           <div>
             <p className="text-xs font-medium text-fg">Save download history</p>
             <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
@@ -68,6 +72,8 @@ export function PrivacySection() {
         <div className="border-t border-border pt-4">
           <DataManagement />
         </div>
+
+        <PermissionOverview />
 
         <div className="rounded-md border border-border bg-bg p-3">
           <div className="flex items-center gap-1.5">

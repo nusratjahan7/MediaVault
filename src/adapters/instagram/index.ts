@@ -7,6 +7,8 @@ import type { HighlightMedia, StoryMedia } from '@/types/story';
 import { identifyInstagramAccount } from './account';
 import { extractInstagram } from './extract';
 import { detectInstagramPageType } from './page-type';
+import type { RelationshipDiscovery } from '@/types/relationship';
+import { discoverInstagramRelationships } from './relationships';
 import {
   discoverInstagramHighlights,
   discoverInstagramStories,
@@ -48,6 +50,10 @@ export class InstagramAdapter extends BasePlatformAdapter {
     },
   ): HighlightMedia[] {
     return discoverInstagramHighlights(context, discovery);
+  }
+
+  discoverRelationships(context: ExtractContext): RelationshipDiscovery | null {
+    return discoverInstagramRelationships(context);
   }
 
   protected discoverRawMedia(context: ExtractContext): ExtractResult {

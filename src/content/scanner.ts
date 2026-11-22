@@ -17,6 +17,7 @@ export function scanPage(document: Document, url: URL): ScanResult {
   const discovery = adapter.discoverMedia(context);
   const stories = adapter.discoverStories?.(context, discovery) ?? [];
   const highlights = adapter.discoverHighlights?.(context, discovery) ?? [];
+  const relationships = adapter.discoverRelationships?.(context) ?? null;
   const deduped = dedupeMediaItems(discovery.items).slice(0, MAX_SCAN_ITEMS);
 
   return {
@@ -29,5 +30,7 @@ export function scanPage(document: Document, url: URL): ScanResult {
     account: discovery.account,
     stories,
     highlights,
+    relationships: relationships?.entries ?? [],
+    ...(relationships ? { relationshipKind: relationships.kind } : {}),
   };
 }

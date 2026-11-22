@@ -16,6 +16,9 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 - [TikTok module](./docs/TIKTOK.md) — videos, thumbnails, slideshows, profile discovery, bulk selection
 - [Bulk selection & queue](./docs/BULK.md) — selection persistence, concurrency, queue controls
 - [Stories & highlights](./docs/STORIES.md) — models, discovery, expiration, covers, privacy boundaries
+- [Saved lists](./docs/SAVED_LISTS.md) — local profile lists, import/export validation, sequential workflow
+- [Relationship export](./docs/RELATIONSHIPS.md) — visible-page and official-export CSV/JSON flows, field selection, limits
+- [Privacy & Ghost Mode](./docs/PRIVACY.md) — local-only status, permissions, clearing data, honest anonymity limits
 - [UI guide](./docs/UI.md) — design system, surfaces, components, demo mode and the mock boundary
 - [Privacy policy](./PRIVACY.md)
 - [Module status](#module-status)
@@ -33,6 +36,9 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 - **Module 10 — Stories & Highlights Manager:** complete. StoryMedia/HighlightMedia models, per-adapter story/highlight discovery, expiration information, per-story/account saves, highlight titles, cover downloads, and explicit privacy/anonymity limitations.
 - **Module 11 — Folder Organization & Filename Rules:** complete. Optional account/category/media-type folders, per-account sorting, posts/videos/Reels/stories/highlights folders, highlight-title organization, filename variables, live preview, saved/reusable templates, reset, sanitization, traversal protection, length limits, and Chrome uniquify duplicates.
 - **Module 13 — Media Format & Quality:** complete. Original/JPG/PNG/WebP image preferences with local canvas conversion, highest-exposed-source video selection, thumbnail/caption/metadata sidecars, and selected/actual format reporting. No video transcoding or audio/video remuxing is claimed.
+- **Module 14 — Account Manager & Saved Lists:** complete. Local lists with create/rename/delete, profile add/remove, multi-select, sequential profile workflow, strict JSON import, and confirmed JSON export.
+- **Module 15 — Account Relationship Export:** complete. Visible followers/following rows plus user-chosen official data exports, local CSV/JSON export, filtering, field selection, and kind isolation. No crawling or privacy-control bypass.
+- **Module 16 — Privacy & Ghost Mode:** complete. Local-only status, data clearing including saved lists/workflow, permission overview, and an honest Ghost Mode section with official platform privacy links and no anonymity claims.
 
 All downloads use Chrome's Downloads API directly. No media is uploaded, proxied, or routed through a MediaVault server.
 
@@ -56,6 +62,10 @@ All downloads use Chrome's Downloads API directly. No media is uploaded, proxied
 - Preserves original images or converts supported images locally to JPG/PNG/WebP.
 - Selects the highest legitimately exposed video source; never invents 4K/60fps/lossless quality.
 - Optionally saves thumbnails, caption text, and source/publication metadata sidecars.
+- Saves local profile lists, selects multiple profiles, and opens a sequential manual download workflow.
+- Exports/imports lists as JSON with strict validation and confirmation dialogs.
+- Exports visible or official-export follower/following data as local CSV or JSON with filtering and field selection.
+- Shows local-only status, permission explanations, saved-list/history clearing, and a Ghost Mode section without anonymity claims.
 - Adds Instagram download buttons beside post actions and on accessible profile-grid items.
 - Saves profile pictures, carousel slides, reels, and directly accessible story/highlight media where permitted.
 - Discovers Facebook photos, direct videos, albums, reels, and visible profile/page media.
@@ -138,6 +148,10 @@ To choose the destination folder yourself, enable **Settings → Downloads → A
 
 Settings → Downloads controls account, category, and media-type folders plus the filename template library and live preview. Settings → Format & quality controls image output, highest-source video selection, and thumbnail/caption/metadata sidecars. Actual queued format and quality appear in queue and history rows.
 
+The **Accounts** page manages local saved lists. Select profiles across lists, then **Start workflow** to open each profile one at a time; downloads remain manual through the popup and no profile crawling occurs. Export/import use explicit confirmation dialogs; imports are validated before anything is saved.
+
+The **Export** page reads follower/following rows already visible on a page or parses an official platform data export you choose. Filter, choose fields, then download CSV or JSON locally. Type-to-read is limited to the visible page or the chosen file.
+
 Enable **Settings → Downloads → Skip Downloaded** to block media already completed in local history. The popup and in-page toasts distinguish “already downloaded” from unavailable media.
 
 Use **Start select** for checkbox selection, **Select all**, individual toggles, **Clear selection**, and **Download N**. Selection persists per browser tab in `chrome.storage.session`. Settings → Downloads → **Parallel downloads** caps concurrency at 1–3. Queue rows expose pause/resume/cancel/retry where supported and show per-item status plus a failure-count summary.
@@ -168,10 +182,11 @@ src/
   sidepanel/         Library and Queue tabs
   history/           Full download history page
   stories/           Stories & highlights manager page
-  accounts/          Account selection preview page
-  components/        UI primitives, layout, media, queue, accounts, history, providers
+  accounts/          Saved lists manager + interface preview
+  relationships/     Followers/following CSV & JSON export page
+  components/        UI primitives, layout, media, queue, accounts, lists, history, settings, providers
   hooks/             Settings, theme, tab, access, scan, selection, downloads, history, queue
-  services/          Typed messaging, permissions, tabs, scan orchestration, errors, navigation
+  services/          Typed messaging, permissions, tabs, scan, relationship import, errors, navigation
   mocks/             UI-only sample accounts/media/queue/history/preview preferences
   adapters/          PlatformAdapter contract, base pipeline, metadata normalization
     instagram/ facebook/ tiktok/   adapter + page-type + account + extraction
@@ -179,7 +194,7 @@ src/
     facebook/                     albums/reels/direct-video guards + post metadata
     tiktok/                       videos/thumbnails/multi-item profile parsing
   downloads/         DownloadService, Chrome client, folder rules, filename builder, output/sidecars, queue
-  storage/           chrome.storage settings/sites + session selection + IndexedDB history
+  storage/           settings/sites/lists + session selection/workflow + IndexedDB history
   types/             Strict shared contracts, message unions, UI contracts
   utils/             URL, filename, page context, status, formatting, errors, logging
 ```
@@ -293,6 +308,12 @@ Known limits (also shown in-product):
 34. Video is never transcoded or remuxed. Highest quality means the best source exposed by the page; separate audio/video streams are not combined, and 4K/60fps/lossless is never promised.
 35. Caption/metadata sidecars use local data URLs through Chrome Downloads; sidecar downloads still need live Chrome E2E verification.
 36. Location is only available when the page exposes location metadata; otherwise `{location}` is omitted.
+37. Saved-list workflows open profiles one at a time; they do not crawl profiles or auto-download media. Use the popup on each opened profile.
+38. Saved-list JSON import rejects malformed data but accepts only the documented username/profile URL/display name fields; extra fields are ignored.
+39. Relationship export reads only currently rendered rows or a user-chosen official export. There is no automatic scrolling, private API, or bypass of hidden/private relationships; official export formats vary.
+40. Ghost Mode reduces local traces only. It does not hide story views, DM read receipts, authentication, or identity, and no anonymity is claimed.
+41. Reset everything clears local extension data; files already downloaded remain on disk.
+42. Official relationship export links and platform privacy links are controlled by each platform and may change.
 
 ## Testing and verification
 
@@ -301,11 +322,11 @@ Verified in this repository:
 ```bash
 npm run typecheck   # strict TypeScript, app + configs
 npm run lint        # ESLint, zero warnings/errors
-npm run test:run    # 197 tests passing
+npm run test:run    # 222 tests passing
 npm run build       # loadable dist/ + manifest/package verification
 ```
 
-Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, the download service (pending/downloading/completed/failed/cancelled, browser-confirmed completion, byte progress, pause/resume, cancellation, retry, Save As, duplicates, Skip Downloaded, configurable concurrency, typed history), per-tab selection persistence and bulk UI, queue controls/failure summaries, story/highlight models and expiration, story/highlight manager UI, highlight title folders/covers, folder organization, filename templates/variables/previews, filename sanitization/traversal/length, saved-template settings UI, highest-source video selection, local image-conversion success and fallback, thumbnail/caption/metadata sidecars, actual output reporting, Instagram profile pictures/grid/story targets, in-page overlay injection, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile cards, caption export, filename safety, URL normalization, settings/history/sites storage, typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
+Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, the download service (pending/downloading/completed/failed/cancelled, browser-confirmed completion, byte progress, pause/resume, cancellation, retry, Save As, duplicates, Skip Downloaded, configurable concurrency, typed history), per-tab selection persistence and bulk UI, queue controls/failure summaries, story/highlight models and expiration, story/highlight manager UI, highlight title folders/covers, saved-list CRUD/import validation/workflow, saved-list UI and confirmation dialogs, visible relationship discovery, official export JSON/CSV parsing, relationship filtering/fields/CSV escaping, relationship page UI, local-only/privacy/permission UI, Ghost Mode copy, folder organization, filename templates/variables/previews, filename sanitization/traversal/length, saved-template settings UI, highest-source video selection, local image-conversion success and fallback, thumbnail/caption/metadata sidecars, actual output reporting, Instagram profile pictures/grid/story targets, in-page overlay injection, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile cards, caption export, filename safety, URL normalization, settings/history/sites storage, typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
 
 **Not yet verified here:** live end-to-end downloads against Instagram, Facebook, and TikTok. That requires loading `dist/` in Chrome and testing with real pages you are authorized to access. The manual QA checklist:
 
@@ -334,9 +355,13 @@ Coverage includes platform/page/account detection, metadata normalization, forma
 - Highest-source video selection records HD/Source quality and the actual extension in history.
 - Thumbnail, caption, and metadata sidecars appear as separate history entries and use the same folder.
 - Media processing access is requested only from Format & quality when conversion is selected.
+- Saved lists can be created, renamed, profile-edited, multi-selected, exported/imported with confirmation, and used to open a sequential profile workflow.
+- Malformed saved-list or relationship imports are rejected before saving; no credentials are stored.
+- Followers/following visible rows and official export files produce filtered CSV/JSON with only selected fields.
+- Privacy status, permission explanations, saved-list clearing, and Ghost Mode links work; no anonymity is claimed.
 - Account selection persists and the popup page-context card reflects the chosen mock account.
 - Full history page shows stats, filters, empty state, and clear confirmation.
-- Side panel switches between Library and Queue; footer links open history/stories/accounts/settings.
+- Side panel switches between Library and Queue; header/footer navigation opens history, stories, accounts, export, and settings.
 - A real download shows browser byte progress; completion appears only after Chrome finishes.
 - Cancel works for queued and in-flight jobs; retry restarts a failed job; Save As opens Chrome's folder picker.
 - Expired links fail with a rescan message rather than a false success.

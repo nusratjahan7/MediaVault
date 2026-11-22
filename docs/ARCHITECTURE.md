@@ -24,6 +24,12 @@ Module 11 (Folder Organization & Filename Rules) is complete: platform-independe
 
 Module 13 (Media Format & Quality) is complete: image output preferences with local canvas conversion, highest-exposed-source video selection, thumbnail/caption/metadata sidecars, and selected/actual output reporting. No video transcoding or audio/video remux is implemented.
 
+Module 14 (Account Manager & Saved Lists) is complete: local list CRUD, profile management, multi-select, strict JSON import/export with confirmation, and a sequential manual profile workflow.
+
+Module 15 (Account Relationship Export) is complete: visible followers/following discovery, user-chosen official export import, filtering, field selection, and local CSV/JSON download with kind isolation.
+
+Module 16 (Privacy & Ghost Mode) is complete: enforced local-only status, saved-list/history/all-data clearing, permission overview, and an honest Ghost Mode section with no anonymity workaround.
+
 ## 2. Runtime topology
 
 ```
@@ -83,16 +89,17 @@ Module 13 (Media Format & Quality) is complete: image output preferences with lo
 | `src/sidepanel/` | Library and Queue views with history/stories/account/settings links |
 | `src/history/` | Full history page with stats, filters, pagination, and actions |
 | `src/stories/` | Stories & highlights manager page |
-| `src/accounts/` | Account-selection preview page |
+| `src/accounts/` | Saved-lists manager plus preserved interface-preview account picker |
+| `src/relationships/` | Visible/official-export follower/following CSV & JSON export page |
 | `src/components/` | UI primitives, layout shell, media/history/queue/context/account/settings components, providers |
 | `src/hooks/` | Reusable state and chrome-API orchestration, plus preview queue/account/history hooks |
 | `src/mocks/` | UI-only sample data and preview preferences; never imports download services |
 | `src/services/` | Messaging, permissions, tabs, scan orchestration, centralized error boundary, page navigation |
 | `src/adapters/` | Platform URL matching/extraction + shared DOM helpers |
 | `src/downloads/` | `DownloadService` engine, Chrome Downloads client, folder rules, filename/output resolution, sidecars, queue facade |
-| `src/storage/` | Settings/sites in `chrome.storage.local`, history in IndexedDB |
-| `src/types/` | Strict contracts and typed message unions |
-| `src/utils/` | URL, filename/templates, format labels, ID, debounce, errors, logging |
+| `src/storage/` | Settings/sites/lists in `chrome.storage.local`; workflow/selection in session; history in IndexedDB |
+| `src/types/` | Strict contracts, messages, saved lists, relationship entries, UI contracts |
+| `src/utils/` | URL, filename/templates, format labels, profile validation, relationship CSV/JSON, files, ID, errors |
 | `src/services/image-conversion.ts` | Local canvas conversion and text data URLs; optional CDN access |
 | `public/` | Manifest and PNG icons copied verbatim into `dist/` |
 | `scripts/` | Icon generation and built-package verification |
@@ -235,10 +242,10 @@ Design rules enforced by the manifest and build verifier:
 
 Two plain Vite builds produce one loadable folder:
 
-1. **Page build** (`vite.config.ts`) — `popup.html`, `options.html`, `sidepanel.html`, `history.html`, `accounts.html`, `stories.html`, and `src/background/index.ts` as an ESM service worker with a fixed `background.js` name. HTML/asset chunks are hashed under `assets/`.
+1. **Page build** (`vite.config.ts`) — `popup.html`, `options.html`, `sidepanel.html`, `history.html`, `accounts.html`, `stories.html`, `relationships.html`, and `src/background/index.ts` as an ESM service worker with a fixed `background.js` name. HTML/asset chunks are hashed under `assets/`.
 2. **Content build** (`vite.content.config.ts`) — `src/content/index.ts` bundled to a single IIFE at the fixed path `content.js`. A fixed path is required for `chrome.scripting.registerContentScripts`; this is why a generic extension plugin is not used.
 
-`public/manifest.json` and `public/icons/*` are copied verbatim; the six HTML entry pages are emitted with hashed asset references by Vite.
+`public/manifest.json` and `public/icons/*` are copied verbatim; the seven HTML entry pages are emitted with hashed asset references by Vite.
 
 **Scripts**
 
@@ -338,8 +345,8 @@ npm run build
 
 - Strict TypeScript across `src/` and build configs.
 - ESLint 9 with React hooks rules.
-- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, story/highlight models, expiration and title folders, the stories manager page, folder organization, filename variables/templates/sanitization/traversal, saved-template UI, highest-source selection, local image conversion/fallback, sidecars, output reporting, Instagram profile pictures/grid/story discovery, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile-card links and bulk selection, per-tab selection persistence and concurrency limits, in-page action placement and click handling, caption export, Skip Downloaded, download service states/progress/pause/cancel/retry/Save As/duplicates, queue controls and failure summary, storage, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
-- `verify-dist.mjs` checks the built package as Chrome would consume it, including all six HTML surfaces.
+- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, story/highlight models, expiration and title folders, the stories manager page, saved-list CRUD/import validation/workflow/UI, visible relationship discovery, official export JSON/CSV parsing, relationship filtering/fields/page UI, privacy status/permission UI/Ghost Mode, folder organization, filename variables/templates/sanitization/traversal, saved-template UI, highest-source selection, local image conversion/fallback, sidecars, output reporting, Instagram profile pictures/grid/story discovery, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile-card links and bulk selection, per-tab selection persistence and concurrency limits, in-page action placement and click handling, caption export, Skip Downloaded, download service states/progress/pause/cancel/retry/Save As/duplicates, queue controls and failure summary, storage, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
+- `verify-dist.mjs` checks the built package as Chrome would consume it, including all seven HTML surfaces.
 
 Live Chrome E2E against real social pages has **not** been run in this environment. The manual QA matrix is in the README.
 

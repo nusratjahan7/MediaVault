@@ -46,6 +46,10 @@ export function App() {
     openExtensionPage('stories.html');
   };
 
+  const openRelationships = () => {
+    openExtensionPage('relationships.html');
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-bg">
       <SidepanelHeader
@@ -158,6 +162,10 @@ export function App() {
         <span aria-hidden="true">·</span>
         <button type="button" onClick={openAccounts} className="hover:text-fg">
           Accounts
+        </button>
+        <span aria-hidden="true">·</span>
+        <button type="button" onClick={openRelationships} className="hover:text-fg">
+          Export
         </button>
         <span aria-hidden="true">·</span>
         <button

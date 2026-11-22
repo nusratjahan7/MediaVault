@@ -100,6 +100,13 @@ The popup also offers **Copy caption & source URL** for Instagram, Facebook, and
 - Failed/cancelled rows expose Retry.
 - A failure count badge and per-item error text summarize problems; the download bar shows overall saved/failed/total progress.
 
+## Accounts, lists & relationship export
+
+- Accounts has **Saved lists** and **Interface preview** views. Saved lists support create/rename/delete, profile add/remove, multi-select, JSON import/export confirmations, and a sequential profile workflow.
+- Export is a dedicated page for visible followers/following rows or an official export file, with filters, field selection, CSV/JSON format, local download, and official privacy/export links.
+- Privacy & data shows local-only status, history/list/total clearing, permission explanations, and current site/media access.
+- Ghost Mode is explicitly informational: no anonymity, view hiding, read-receipt hiding, token access, or bypass claims.
+
 ## Download organization & format settings
 
 - Settings → Downloads includes folder toggles (account/category/media-type), a path preview, saved filename templates, variable chips, a live filename preview, save-as-template, and reset-to-default.

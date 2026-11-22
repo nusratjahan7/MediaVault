@@ -1,5 +1,6 @@
 import type { AccountIdentity, PageType } from './page';
 import type { PlatformId } from './platform';
+import type { RelationshipEntry, RelationshipKind } from './relationship';
 import type { HighlightMedia, StoryMedia } from './story';
 
 export type MediaKind = 'image' | 'video';
@@ -83,4 +84,6 @@ export interface ScanResult {
   account?: AccountIdentity | null;
   stories?: StoryMedia[];
   highlights?: HighlightMedia[];
+  relationships?: RelationshipEntry[];
+  relationshipKind?: RelationshipKind;
 }

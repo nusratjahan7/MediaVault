@@ -9,6 +9,7 @@ import { AboutSection } from './sections/AboutSection';
 import { AppearanceSection } from './sections/AppearanceSection';
 import { DownloadSection } from './sections/DownloadSection';
 import { FormatSection } from './sections/FormatSection';
+import { GhostModeSection } from './sections/GhostModeSection';
 import { PreviewSection } from './sections/PreviewSection';
 import { PrivacySection } from './sections/PrivacySection';
 import { SitesSection } from './sections/SitesSection';
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { href: '#sites', label: 'Site access' },
   { href: '#preview', label: 'Interface preview' },
   { href: '#privacy', label: 'Privacy & data' },
+  { href: '#ghost-mode', label: 'Ghost mode' },
   { href: '#about', label: 'About' },
 ];
 
@@ -93,6 +95,7 @@ export function App() {
             <SitesSection />
             <PreviewSection />
             <PrivacySection />
+            <GhostModeSection />
             <AboutSection />
 
             <p className="px-1 pb-2 text-center text-[10px] leading-relaxed text-muted">

@@ -2,6 +2,7 @@ export type ExtensionPage =
   | 'history.html'
   | 'accounts.html'
   | 'stories.html'
+  | 'relationships.html'
   | 'options.html';
 
 export function openExtensionPage(

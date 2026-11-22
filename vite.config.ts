@@ -25,6 +25,7 @@ export default defineConfig({
         history: `${root}history.html`,
         accounts: `${root}accounts.html`,
         stories: `${root}stories.html`,
+        relationships: `${root}relationships.html`,
         background: `${root}src/background/index.ts`,
       },
       output: {
