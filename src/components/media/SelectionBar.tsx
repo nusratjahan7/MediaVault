@@ -21,7 +21,11 @@ export function SelectionBar({
   onDownload,
 }: SelectionBarProps) {
   return (
-    <div className="sticky bottom-0 z-10 mt-3 border-t border-border bg-surface/95 px-3 py-3 backdrop-blur">
+    <div
+      role="toolbar"
+      aria-label="Bulk selection toolbar"
+      className="sticky bottom-0 z-10 mt-3 border-t border-border bg-surface/95 px-3 py-3 backdrop-blur"
+    >
       <div className="flex items-center justify-between gap-2">
         <button
           type="button"

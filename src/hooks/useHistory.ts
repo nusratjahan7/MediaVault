@@ -28,7 +28,7 @@ export interface HistoryController {
   clearAll: () => Promise<number>;
 }
 
-export function useHistory(): HistoryController {
+export function useHistory(enabled = true): HistoryController {
   const [filters, setFiltersState] = useState<HistoryFilters>({
     platform: 'all',
     status: 'all',
@@ -70,6 +70,15 @@ export function useHistory(): HistoryController {
   );
 
   const refresh = useCallback(async () => {
+    if (!enabled) {
+      setEntries([]);
+      setTotal(0);
+      setHasMore(false);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -83,13 +92,17 @@ export function useHistory(): HistoryController {
     } finally {
       setLoading(false);
     }
-  }, [requestPage]);
+  }, [enabled, requestPage]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     const listener = (message: unknown) => {
       if (isDownloadsUpdatedEvent(message)) {
         void refresh();
@@ -98,10 +111,10 @@ export function useHistory(): HistoryController {
 
     chrome.runtime.onMessage.addListener(listener);
     return () => chrome.runtime.onMessage.removeListener(listener);
-  }, [refresh]);
+  }, [enabled, refresh]);
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore) {
+    if (!enabled || loadingMore || !hasMore) {
       return;
     }
 
@@ -117,7 +130,7 @@ export function useHistory(): HistoryController {
     } finally {
       setLoadingMore(false);
     }
-  }, [entries.length, hasMore, loadingMore, requestPage]);
+  }, [enabled, entries.length, hasMore, loadingMore, requestPage]);
 
   const setFilters = useCallback((patch: Partial<HistoryFilters>) => {
     setFiltersState((previous) => ({ ...previous, ...patch }));

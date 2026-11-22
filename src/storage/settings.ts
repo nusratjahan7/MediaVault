@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoScan: true,
   historyEnabled: true,
   maxHistoryEntries: 500,
+  demoMode: false,
 };
 
 interface SettingsEnvelope {
@@ -72,6 +73,7 @@ export function coerceSettings(value: unknown): Settings {
     autoScan: coerceBoolean(value.autoScan, DEFAULT_SETTINGS.autoScan),
     historyEnabled: coerceBoolean(value.historyEnabled, DEFAULT_SETTINGS.historyEnabled),
     maxHistoryEntries: coerceHistoryLimit(value.maxHistoryEntries),
+    demoMode: coerceBoolean(value.demoMode, DEFAULT_SETTINGS.demoMode),
   };
 }
 

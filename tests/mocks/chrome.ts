@@ -193,6 +193,18 @@ export const chromeMock = {
       return clone(tab);
     }),
     query: vi.fn(async () => [...tabs.values()].filter((tab) => tab.active).map((tab) => clone(tab))),
+    create: vi.fn(async (properties: chrome.tabs.CreateProperties) => {
+      const id = 100 + tabs.size;
+      const tab = {
+        id,
+        active: properties.active ?? true,
+        windowId: 1,
+        url: properties.url ?? '',
+        title: 'MediaVault',
+      } as chrome.tabs.Tab;
+      tabs.set(id, tab);
+      return clone(tab);
+    }),
     sendMessage: vi.fn(
       (_tabId: number, _message: unknown, callback?: (response: unknown) => void) => {
         callback?.(undefined);

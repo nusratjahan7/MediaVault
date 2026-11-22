@@ -9,9 +9,15 @@ export interface MediaCardProps {
   item: MediaItem;
   selected: boolean;
   onToggle: () => void;
+  selectionMode?: boolean;
 }
 
-export function MediaCard({ item, selected, onToggle }: MediaCardProps) {
+export function MediaCard({
+  item,
+  selected,
+  onToggle,
+  selectionMode = true,
+}: MediaCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const showImage = Boolean(item.thumbnailUrl) && !imageFailed;
   const duration = formatDuration(item.durationSeconds);
@@ -22,14 +28,16 @@ export function MediaCard({ item, selected, onToggle }: MediaCardProps) {
     <button
       type="button"
       onClick={onToggle}
-      disabled={!item.downloadable}
-      aria-pressed={item.downloadable ? selected : undefined}
+      disabled={!item.downloadable || !selectionMode}
+      aria-pressed={item.downloadable && selectionMode ? selected : undefined}
       aria-label={
-        item.downloadable
-          ? `${selected ? 'Deselect' : 'Select'} ${item.kind}${
-              item.author ? ` by ${item.author}` : ''
-            }`
-          : item.unsupportedReason ?? 'This media cannot be downloaded'
+        !item.downloadable
+          ? item.unsupportedReason ?? 'This media cannot be downloaded'
+          : selectionMode
+            ? `${selected ? 'Deselect' : 'Select'} ${item.kind}${
+                item.author ? ` by ${item.author}` : ''
+              }`
+            : `${item.kind} preview${item.author ? ` by ${item.author}` : ''}`
       }
       className={cn(
         'group relative overflow-hidden rounded-md border bg-surface text-left transition duration-150 focus-visible:outline-none',
@@ -80,7 +88,7 @@ export function MediaCard({ item, selected, onToggle }: MediaCardProps) {
           )}
         </div>
 
-        {item.downloadable && (
+        {item.downloadable && selectionMode && (
           <span
             aria-hidden="true"
             className={cn(

@@ -9,6 +9,7 @@ export const HISTORY_STORE = 'history' as const;
 
 export const SETTINGS_STORAGE_KEY = 'mediavault:settings:v1';
 export const SITES_STORAGE_KEY = 'mediavault:sites:v1';
+export const PREVIEW_ACCOUNTS_STORAGE_KEY = 'mediavault:preview:accounts:v1';
 export const SETTINGS_SCHEMA_VERSION = 1;
 
 export const CONTENT_SCRIPT_FILE = 'content.js';

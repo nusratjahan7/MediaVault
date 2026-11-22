@@ -15,12 +15,14 @@ import { pluralize } from '@/utils/format';
 export interface LibraryViewProps {
   history: HistoryController;
   historyEnabled: boolean;
+  mode: 'live' | 'demo';
   onOpenSettings: () => void;
 }
 
 export function LibraryView({
   history,
   historyEnabled,
+  mode,
   onOpenSettings,
 }: LibraryViewProps) {
   const { toast } = useToast();
@@ -28,6 +30,15 @@ export function LibraryView({
   const [clearing, setClearing] = useState(false);
 
   const handleReveal = async (entry: HistoryEntry) => {
+    if (mode === 'demo') {
+      toast({
+        title: 'Preview only',
+        description: 'Sample history entries are not connected to real files.',
+        variant: 'default',
+      });
+      return;
+    }
+
     if (entry.downloadId === undefined) {
       toast({
         title: 'File unavailable',
@@ -48,6 +59,15 @@ export function LibraryView({
   };
 
   const handleRetry = async (entry: HistoryEntry) => {
+    if (mode === 'demo') {
+      toast({
+        title: 'Preview: retry queued',
+        description: 'Demo mode does not start a real download.',
+        variant: 'default',
+      });
+      return;
+    }
+
     try {
       const response = await sendToBackground({
         type: 'DOWNLOAD_ITEMS',

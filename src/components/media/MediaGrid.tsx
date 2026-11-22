@@ -6,10 +6,16 @@ import { MediaCard } from './MediaCard';
 export interface MediaGridProps {
   items: MediaItem[];
   selection: SelectionController;
+  selectionMode?: boolean;
   className?: string;
 }
 
-export function MediaGrid({ items, selection, className }: MediaGridProps) {
+export function MediaGrid({
+  items,
+  selection,
+  selectionMode = true,
+  className,
+}: MediaGridProps) {
   return (
     <div className={cn('grid grid-cols-2 gap-2.5', className)}>
       {items.map((item) => (
@@ -18,6 +24,7 @@ export function MediaGrid({ items, selection, className }: MediaGridProps) {
           item={item}
           selected={selection.isSelected(item.id)}
           onToggle={() => selection.toggle(item.id)}
+          selectionMode={selectionMode}
         />
       ))}
     </div>

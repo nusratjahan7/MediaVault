@@ -1,43 +1,111 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Globe2, ShieldCheck } from 'lucide-react';
+import { Globe2, ShieldCheck, Sparkles } from 'lucide-react';
 import { getAdapterForUrl } from '@/adapters/registry';
-import { PLATFORM_IDS, PLATFORM_META } from '@/constants';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { PageContextCard } from '@/components/context/PageContextCard';
 import { PlatformBadge } from '@/components/media/PlatformBadge';
 import type { MediaFilter } from '@/components/media/MediaFilters';
+import { QueuePreview } from '@/components/queue/QueuePreview';
+import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { PLATFORM_IDS, PLATFORM_META } from '@/constants';
 import { useActiveTab } from '@/hooks/useActiveTab';
 import { useDownloads } from '@/hooks/useDownloads';
-import { useScan } from '@/hooks/useScan';
+import { usePreviewAccount } from '@/hooks/usePreviewAccount';
+import { useQueuePreview } from '@/hooks/useQueuePreview';
+import { useScan, type ScanController } from '@/hooks/useScan';
 import { useSelection } from '@/hooks/useSelection';
 import { useSettings } from '@/hooks/useSettings';
 import { useSiteAccess } from '@/hooks/useSiteAccess';
 import { useToast } from '@/hooks/useToast';
+import { getMockPageContext } from '@/mocks/pages';
+import { getMockScanResult } from '@/mocks/media';
+import { openExtensionPage } from '@/services/navigation';
+import type { MediaItem } from '@/types/media';
+import type { PlatformId } from '@/types/platform';
+import type { PageContext } from '@/types/ui';
+import { getErrorMessage } from '@/utils/errors';
+import { inferPageKind } from '@/utils/page-context';
+import { DemoToolbar } from './DemoToolbar';
 import { PopupHeader } from './PopupHeader';
 import { ScanView } from './ScanView';
 import { SiteAccessGate } from './SiteAccessGate';
 
 export function App() {
-  const { settings } = useSettings();
+  const { settings, updateSettings } = useSettings();
   const { toast } = useToast();
-  const { tab, url, loading: tabLoading } = useActiveTab();
-  const adapter = useMemo(() => (url ? getAdapterForUrl(url) : undefined), [url]);
-  const platform = adapter?.id ?? null;
-  const siteAccess = useSiteAccess(platform, tab?.id);
+  const demo = settings.demoMode;
 
-  const scan = useScan(
-    tab?.id ?? null,
-    siteAccess.status?.enabled ?? false,
-    settings.autoScan,
-  );
-  const selection = useSelection(scan.result?.items ?? []);
-  const downloads = useDownloads();
-
+  const [demoPlatform, setDemoPlatform] = useState<PlatformId>('instagram');
   const [filter, setFilter] = useState<MediaFilter>('all');
+  const [selectionMode, setSelectionMode] = useState(false);
+
+  const { tab, url, loading: tabLoading } = useActiveTab();
+  const liveAdapter = useMemo(() => (url ? getAdapterForUrl(url) : undefined), [url]);
+  const livePlatform = liveAdapter?.id ?? null;
+
+  const siteAccess = useSiteAccess(demo ? null : livePlatform, tab?.id);
+  const liveScan = useScan(
+    demo ? null : (tab?.id ?? null),
+    !demo && (siteAccess.status?.enabled ?? false),
+    !demo && settings.autoScan,
+  );
+
+  const previewAccount = usePreviewAccount(demoPlatform);
+  const mockScanResult = useMemo(() => getMockScanResult(demoPlatform), [demoPlatform]);
+  const mockScan = useMemo<ScanController>(
+    () => ({
+      state: 'success',
+      result: mockScanResult,
+      error: null,
+      scan: async () => undefined,
+    }),
+    [mockScanResult],
+  );
+  const mockPageContext = useMemo(
+    () => getMockPageContext(demoPlatform, previewAccount),
+    [demoPlatform, previewAccount],
+  );
+
+  const scan = demo ? mockScan : liveScan;
+  const items = useMemo(() => scan.result?.items ?? [], [scan.result]);
+  const selection = useSelection(items);
+  const downloads = useDownloads();
+  const queue = useQueuePreview(demo);
+
+  const livePageContext = useMemo<PageContext | null>(() => {
+    if (demo || !livePlatform || !url || !liveScan.result) {
+      return null;
+    }
+
+    const first =
+      liveScan.result.items.find((item) => item.author) ?? liveScan.result.items[0];
+
+    return {
+      platform: livePlatform,
+      author: first?.author,
+      accountName: first?.author,
+      handle: first?.author,
+      pageTitle: first?.caption ?? url.pathname,
+      pageUrl: liveScan.result.pageUrl,
+      pageKind: inferPageKind(url),
+      mediaCount: liveScan.result.items.length,
+      capturedAt: liveScan.result.scannedAt,
+      mode: 'live',
+    };
+  }, [demo, livePlatform, url, liveScan.result]);
+
+  const pageContext = demo ? mockPageContext : livePageContext;
+  const downloadableItems = useMemo(
+    () => items.filter((item) => item.downloadable),
+    [items],
+  );
+  const currentItem = downloadableItems[0];
 
   useEffect(() => {
     setFilter('all');
-  }, [scan.result?.pageUrl]);
+    setSelectionMode(false);
+  }, [scan.result?.pageUrl, demoPlatform, demo]);
 
   const openSettings = useCallback(() => {
     void chrome.runtime.openOptionsPage().finally(() => window.close());
@@ -67,6 +135,35 @@ export function App() {
     }
   }, [tab?.windowId, toast]);
 
+  const openHistory = useCallback(() => {
+    openExtensionPage('history.html');
+  }, []);
+
+  const openAccounts = useCallback(() => {
+    openExtensionPage('accounts.html');
+  }, []);
+
+  const enablePreview = useCallback(async () => {
+    try {
+      await updateSettings({ demoMode: true });
+      toast({
+        title: 'UI preview enabled',
+        description: 'Showing sample data. Downloads are simulated.',
+        variant: 'success',
+      });
+    } catch (caught) {
+      toast({
+        title: 'Could not enable preview',
+        description: getErrorMessage(caught),
+        variant: 'error',
+      });
+    }
+  }, [toast, updateSettings]);
+
+  const exitPreview = useCallback(() => {
+    void updateSettings({ demoMode: false });
+  }, [updateSettings]);
+
   const handleEnable = useCallback(async () => {
     const result = await siteAccess.enable();
 
@@ -79,130 +176,222 @@ export function App() {
       return;
     }
 
-    if (platform) {
+    if (livePlatform) {
       toast({
-        title: `${PLATFORM_META[platform].label} enabled`,
+        title: `${PLATFORM_META[livePlatform].label} enabled`,
         description: 'Scanning this page now.',
         variant: 'success',
       });
     }
 
     await siteAccess.refresh();
-  }, [platform, siteAccess, toast]);
+  }, [livePlatform, siteAccess, toast]);
 
-  const handleDownload = useCallback(async () => {
-    if (selection.selectedItems.length === 0) {
-      return;
-    }
+  const { enqueue: enqueueLive } = downloads;
+  const addMockMedia = queue.addMockMedia;
+  const clearSelection = selection.clear;
 
-    const result = await downloads.enqueue(selection.selectedItems);
+  const queueMedia = useCallback(
+    async (target: MediaItem[]) => {
+      if (target.length === 0) {
+        return;
+      }
 
-    if (!result) {
+      if (demo) {
+        addMockMedia?.(target);
+        clearSelection();
+        setSelectionMode(false);
+        toast({
+          title: `Preview: ${target.length} ${
+            target.length === 1 ? 'item' : 'items'
+          } queued`,
+          description: 'Demo mode — no files are downloaded and nothing leaves this device.',
+          variant: 'success',
+        });
+        return;
+      }
+
+      const result = await enqueueLive(target);
+
+      if (!result) {
+        toast({
+          title: 'Download could not start',
+          description: 'Try scanning again to refresh the media links.',
+          variant: 'error',
+        });
+        return;
+      }
+
+      if (result.accepted.length === 0) {
+        toast({
+          title: 'Nothing to download',
+          description: 'The selected items have no direct file link.',
+          variant: 'error',
+        });
+        return;
+      }
+
+      clearSelection();
+      setSelectionMode(false);
       toast({
-        title: 'Download could not start',
-        description: 'Try scanning again to refresh the media links.',
-        variant: 'error',
+        title: `${result.accepted.length} ${
+          result.accepted.length === 1 ? 'download' : 'downloads'
+        } queued`,
+        description:
+          result.skipped > 0
+            ? `${result.skipped} item(s) skipped because they have no direct link.`
+            : 'Progress appears below. Files are saved to your download folder.',
+        variant: 'success',
       });
+    },
+    [addMockMedia, clearSelection, demo, enqueueLive, toast],
+  );
+
+  const toggleSelectionMode = () => {
+    if (selectionMode) {
+      clearSelection();
+      setSelectionMode(false);
       return;
     }
-
-    if (result.accepted.length === 0) {
-      toast({
-        title: 'Nothing to download',
-        description: 'The selected items have no direct file link.',
-        variant: 'error',
-      });
-      return;
-    }
-
-    selection.clear();
-    toast({
-      title: `${result.accepted.length} ${
-        result.accepted.length === 1 ? 'download' : 'downloads'
-      } queued`,
-      description:
-        result.skipped > 0
-          ? `${result.skipped} item(s) skipped because they have no direct link.`
-          : 'Progress appears below. Files are saved to your download folder.',
-      variant: 'success',
-    });
-  }, [downloads, selection, toast]);
+    setSelectionMode(true);
+  };
 
   const content = (() => {
-    if (tabLoading) {
-      return (
-        <div className="space-y-3 p-4">
-          <Skeleton className="h-4 w-40" />
-          <Skeleton className="h-3 w-56" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-8 w-full" />
-        </div>
-      );
-    }
-
-    if (!url || !platform) {
-      return (
-        <div className="space-y-3 p-3">
-          <EmptyState
-            icon={<Globe2 className="size-5" aria-hidden="true" />}
-            title="Not a supported page"
-            description="Open a post, photo, reel, or video on Instagram, Facebook, or TikTok, then click MediaVault again."
-          />
-          <div className="space-y-2 rounded-lg border border-border bg-surface p-3">
-            <p className="text-[10px] font-medium tracking-wide text-muted uppercase">
-              Supported platforms
-            </p>
-            {PLATFORM_IDS.map((id) => (
-              <div key={id} className="flex items-center justify-between gap-2">
-                <PlatformBadge platform={id} />
-                <span className="max-w-[60%] text-right text-[10px] leading-tight text-muted">
-                  {PLATFORM_META[id].description}
-                </span>
-              </div>
-            ))}
+    if (!demo) {
+      if (tabLoading) {
+        return (
+          <div className="space-y-3 p-4">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-56" />
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-8 w-full" />
           </div>
-        </div>
-      );
-    }
+        );
+      }
 
-    if (siteAccess.loading && !siteAccess.status) {
-      return (
-        <div className="space-y-3 p-4">
-          <Skeleton className="h-11 w-11 rounded-lg" />
-          <Skeleton className="h-4 w-48" />
-          <Skeleton className="h-3 w-64" />
-          <Skeleton className="h-9 w-full" />
-        </div>
-      );
-    }
+      if (!url || !livePlatform) {
+        return (
+          <div className="space-y-3 p-3">
+            <EmptyState
+              icon={<Globe2 className="size-5" aria-hidden="true" />}
+              title="Not a supported page"
+              description="Open a post, photo, reel, or video on Instagram, Facebook, or TikTok, then click MediaVault again. You can also explore the full interface with sample data."
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              block
+              onClick={() => {
+                void enablePreview();
+              }}
+              icon={<Sparkles className="size-3.5" aria-hidden="true" />}
+            >
+              Preview the interface
+            </Button>
+            <div className="space-y-2 rounded-lg border border-border bg-surface p-3">
+              <p className="text-[10px] font-medium tracking-wide text-muted uppercase">
+                Supported platforms
+              </p>
+              {PLATFORM_IDS.map((id) => (
+                <div key={id} className="flex items-center justify-between gap-2">
+                  <PlatformBadge platform={id} />
+                  <span className="max-w-[60%] text-right text-[10px] leading-tight text-muted">
+                    {PLATFORM_META[id].description}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
 
-    if (!siteAccess.status?.enabled) {
-      return (
-        <SiteAccessGate
-          platform={platform}
-          busy={siteAccess.busy}
-          error={siteAccess.error}
-          onEnable={() => {
-            void handleEnable();
-          }}
-        />
-      );
+      if (siteAccess.loading && !siteAccess.status) {
+        return (
+          <div className="space-y-3 p-4">
+            <Skeleton className="h-11 w-11 rounded-lg" />
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-3 w-64" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+        );
+      }
+
+      if (!siteAccess.status?.enabled) {
+        return (
+          <div>
+            <SiteAccessGate
+              platform={livePlatform}
+              busy={siteAccess.busy}
+              error={siteAccess.error}
+              onEnable={() => {
+                void handleEnable();
+              }}
+            />
+            <div className="px-4 pb-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                block
+                onClick={() => {
+                  void enablePreview();
+                }}
+                icon={<Sparkles className="size-3.5" aria-hidden="true" />}
+              >
+                Preview with demo data
+              </Button>
+            </div>
+          </div>
+        );
+      }
     }
 
     return (
-      <ScanView
-        scan={scan}
-        filter={filter}
-        onFilterChange={setFilter}
-        selection={selection}
-        downloads={downloads}
-        onDownload={() => {
-          void handleDownload();
-        }}
-        onOpenLibrary={() => {
-          void openLibrary();
-        }}
-      />
+      <div>
+        {pageContext && (
+          <div className="animate-rise px-3 pt-3">
+            <PageContextCard
+              context={pageContext}
+              account={demo ? previewAccount : undefined}
+              onSwitchAccount={demo ? openAccounts : undefined}
+              compact
+            />
+          </div>
+        )}
+
+        {queue.items.length > 0 && (
+          <div className="animate-rise px-3 pt-3">
+            <QueuePreview
+              controller={queue}
+              limit={2}
+              onViewAll={openHistory}
+            />
+          </div>
+        )}
+
+        <ScanView
+          scan={scan}
+          filter={filter}
+          onFilterChange={setFilter}
+          selection={selection}
+          downloads={downloads}
+          selectionMode={selectionMode}
+          onToggleSelection={toggleSelectionMode}
+          onDownloadCurrent={() => {
+            if (currentItem) {
+              void queueMedia([currentItem]);
+            }
+          }}
+          onBulkDownload={() => {
+            void queueMedia(downloadableItems);
+          }}
+          onDownload={() => {
+            void queueMedia(selection.selectedItems);
+          }}
+          onOpenLibrary={() => {
+            void openLibrary();
+          }}
+        />
+      </div>
     );
   })();
 
@@ -215,11 +404,19 @@ export function App() {
         onOpenSettings={openSettings}
       />
 
+      {demo && (
+        <DemoToolbar
+          platform={demoPlatform}
+          onPlatformChange={setDemoPlatform}
+          onExit={exitPreview}
+        />
+      )}
+
       <main className="mv-scrollbar flex-1 overflow-y-auto">{content}</main>
 
       <footer className="flex items-center justify-center gap-1.5 border-t border-border bg-surface px-3 py-2 text-[10px] text-muted">
         <ShieldCheck className="size-3 text-success" aria-hidden="true" />
-        Local only. Nothing is uploaded.
+        {demo ? 'Demo data · nothing is downloaded or uploaded' : 'Local only. Nothing is uploaded.'}
       </footer>
     </div>
   );

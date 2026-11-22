@@ -4,3 +4,4 @@ export * from './media';
 export * from './messages';
 export * from './platform';
 export * from './settings';
+export * from './ui';

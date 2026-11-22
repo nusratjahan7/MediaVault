@@ -1,12 +1,14 @@
 import { Moon, Sun } from 'lucide-react';
 import { BrandMark } from '@/components/layout/BrandMark';
 import { Container } from '@/components/layout/Container';
+import { PageNav } from '@/components/layout/PageNav';
 import { IconButton } from '@/components/ui/IconButton';
 import { useTheme } from '@/hooks/useTheme';
 import { APP_VERSION } from '@/constants';
 import { AboutSection } from './sections/AboutSection';
 import { AppearanceSection } from './sections/AppearanceSection';
 import { DownloadSection } from './sections/DownloadSection';
+import { PreviewSection } from './sections/PreviewSection';
 import { PrivacySection } from './sections/PrivacySection';
 import { SitesSection } from './sections/SitesSection';
 
@@ -14,6 +16,7 @@ const NAV_ITEMS = [
   { href: '#appearance', label: 'Appearance' },
   { href: '#downloads', label: 'Downloads' },
   { href: '#sites', label: 'Site access' },
+  { href: '#preview', label: 'Interface preview' },
   { href: '#privacy', label: 'Privacy & data' },
   { href: '#about', label: 'About' },
 ];
@@ -35,8 +38,10 @@ export function App() {
             </div>
           </div>
 
+          <PageNav active="settings" />
+
           <div className="flex items-center gap-1">
-            <span className="mr-1 hidden text-[11px] text-muted sm:inline">
+            <span className="mr-1 hidden text-[11px] text-muted lg:inline">
               All preferences stay on this device
             </span>
             <IconButton
@@ -83,6 +88,7 @@ export function App() {
             <AppearanceSection />
             <DownloadSection />
             <SitesSection />
+            <PreviewSection />
             <PrivacySection />
             <AboutSection />
 

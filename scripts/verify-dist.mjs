@@ -61,9 +61,11 @@ for (const field of ['name', 'version', 'description', 'minimum_chrome_version']
   }
 }
 
+const extraPages = ['history.html', 'accounts.html'];
 const requiredFiles = new Set([
   'manifest.json',
   'content.js',
+  ...extraPages,
   manifest.action?.default_popup,
   manifest.options_ui?.page,
   manifest.side_panel?.default_path,
@@ -104,6 +106,7 @@ const htmlPages = [
   manifest.action?.default_popup,
   manifest.options_ui?.page,
   manifest.side_panel?.default_path,
+  ...extraPages,
 ].filter((page) => typeof page === 'string');
 
 for (const page of htmlPages) {

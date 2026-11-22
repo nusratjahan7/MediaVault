@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { DownloadBar } from '@/components/media/DownloadBar';
 import { LimitationNotice } from '@/components/media/LimitationNotice';
+import { MediaActionBar } from '@/components/media/MediaActionBar';
 import { MediaFilters } from '@/components/media/MediaFilters';
 import { MediaGrid } from '@/components/media/MediaGrid';
 import { SelectionBar } from '@/components/media/SelectionBar';
@@ -21,6 +22,10 @@ export interface ScanViewProps {
   onFilterChange: (filter: MediaFilter) => void;
   selection: SelectionController;
   downloads: DownloadController;
+  selectionMode: boolean;
+  onToggleSelection: () => void;
+  onDownloadCurrent: () => void;
+  onBulkDownload: () => void;
   onDownload: () => void;
   onOpenLibrary: () => void;
 }
@@ -39,6 +44,10 @@ export function ScanView({
   onFilterChange,
   selection,
   downloads,
+  selectionMode,
+  onToggleSelection,
+  onDownloadCurrent,
+  onBulkDownload,
   onDownload,
   onOpenLibrary,
 }: ScanViewProps) {
@@ -166,10 +175,23 @@ export function ScanView({
 
         <LimitationNotice limitations={limitations} />
 
+        <MediaActionBar
+          itemCount={selection.selectableCount}
+          selectionMode={selectionMode}
+          busy={downloads.progress.submitting}
+          onDownloadCurrent={onDownloadCurrent}
+          onBulkDownload={onBulkDownload}
+          onToggleSelection={onToggleSelection}
+        />
+
         <MediaFilters value={filter} onChange={onFilterChange} counts={counts} />
 
         {filtered.length > 0 ? (
-          <MediaGrid items={filtered} selection={selection} />
+          <MediaGrid
+            items={filtered}
+            selection={selection}
+            selectionMode={selectionMode}
+          />
         ) : (
           <EmptyState
             compact
@@ -191,15 +213,17 @@ export function ScanView({
         onDismiss={downloads.reset}
       />
 
-      <SelectionBar
-        selectedCount={selection.selectedItems.length}
-        selectableCount={selection.selectableCount}
-        allSelected={selection.allSelected}
-        busy={downloads.progress.submitting}
-        onSelectAll={selection.selectAll}
-        onClear={selection.clear}
-        onDownload={onDownload}
-      />
+      {selectionMode && (
+        <SelectionBar
+          selectedCount={selection.selectedItems.length}
+          selectableCount={selection.selectableCount}
+          allSelected={selection.allSelected}
+          busy={downloads.progress.submitting}
+          onSelectAll={selection.selectAll}
+          onClear={selection.clear}
+          onDownload={onDownload}
+        />
+      )}
     </div>
   );
 }

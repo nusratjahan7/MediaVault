@@ -7,4 +7,5 @@ export interface Settings {
   autoScan: boolean;
   historyEnabled: boolean;
   maxHistoryEntries: number;
+  demoMode: boolean;
 }

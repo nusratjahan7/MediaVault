@@ -6,30 +6,13 @@ import {
   Trash2,
   Video,
 } from 'lucide-react';
-import type { DownloadStatus, HistoryEntry } from '@/types/history';
+import type { HistoryEntry } from '@/types/history';
 import { cn } from '@/utils/cn';
 import { formatBytes, formatRelativeTime } from '@/utils/format';
-import { Badge, type BadgeTone } from '../ui/Badge';
+import { STATUS_META } from '@/utils/status';
+import { Badge } from '../ui/Badge';
 import { IconButton } from '../ui/IconButton';
 import { PlatformBadge } from '../media/PlatformBadge';
-
-const STATUS_TONES: Record<DownloadStatus, BadgeTone> = {
-  completed: 'success',
-  downloading: 'accent',
-  queued: 'neutral',
-  failed: 'danger',
-  interrupted: 'warning',
-  cancelled: 'neutral',
-};
-
-const STATUS_LABELS: Record<DownloadStatus, string> = {
-  completed: 'Saved',
-  downloading: 'Downloading',
-  queued: 'Queued',
-  failed: 'Failed',
-  interrupted: 'Interrupted',
-  cancelled: 'Cancelled',
-};
 
 export interface HistoryRowProps {
   entry: HistoryEntry;
@@ -40,6 +23,7 @@ export interface HistoryRowProps {
 
 export function HistoryRow({ entry, onReveal, onRetry, onDelete }: HistoryRowProps) {
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
+  const meta = STATUS_META[entry.status];
   const thumbnail = entry.item.thumbnailUrl;
   const canReveal = entry.status === 'completed' && entry.downloadId !== undefined;
   const canRetry =
@@ -100,7 +84,7 @@ export function HistoryRow({ entry, onReveal, onRetry, onDelete }: HistoryRowPro
         </div>
 
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <Badge tone={STATUS_TONES[entry.status]}>{STATUS_LABELS[entry.status]}</Badge>
+          <Badge tone={meta.tone}>{meta.label}</Badge>
           <PlatformBadge platform={entry.item.platform} />
           <span className="text-[10px] text-muted">
             {formatRelativeTime(entry.createdAt)}

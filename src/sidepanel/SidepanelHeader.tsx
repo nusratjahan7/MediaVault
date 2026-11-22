@@ -1,4 +1,4 @@
-import { Moon, Settings, Sun } from 'lucide-react';
+import { History, Moon, Settings, Sun } from 'lucide-react';
 import { BrandMark } from '@/components/layout/BrandMark';
 import { IconButton } from '@/components/ui/IconButton';
 import { useTheme } from '@/hooks/useTheme';
@@ -7,9 +7,14 @@ import { pluralize } from '@/utils/format';
 export interface SidepanelHeaderProps {
   total: number;
   onOpenSettings: () => void;
+  onOpenHistory: () => void;
 }
 
-export function SidepanelHeader({ total, onOpenSettings }: SidepanelHeaderProps) {
+export function SidepanelHeader({
+  total,
+  onOpenSettings,
+  onOpenHistory,
+}: SidepanelHeaderProps) {
   const { resolvedTheme, setTheme } = useTheme();
 
   return (
@@ -36,6 +41,9 @@ export function SidepanelHeader({ total, onOpenSettings }: SidepanelHeaderProps)
           ) : (
             <Moon className="size-4" aria-hidden="true" />
           )}
+        </IconButton>
+        <IconButton label="Open full history" onClick={onOpenHistory}>
+          <History className="size-4" aria-hidden="true" />
         </IconButton>
         <IconButton label="Open settings" onClick={onOpenSettings}>
           <Settings className="size-4" aria-hidden="true" />
