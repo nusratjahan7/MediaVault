@@ -4,6 +4,7 @@ import { Section } from '@/components/layout/Section';
 import { FilenameTemplateField } from '@/components/settings/FilenameTemplateField';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Toggle } from '@/components/ui/Toggle';
 import { useSettings } from '@/hooks/useSettings';
 import { useToast } from '@/hooks/useToast';
 import { DEFAULT_SETTINGS } from '@/storage/settings';
@@ -103,6 +104,24 @@ export function DownloadSection() {
             }
           }}
         />
+
+        <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-fg">Ask where to save each file</p>
+            <p className="mt-0.5 max-w-[60ch] text-[11px] leading-relaxed text-muted">
+              Uses Chrome’s native Save As dialog so you can choose the destination folder for
+              every download. When off, Chrome saves to your default download folder using the
+              subfolder above.
+            </p>
+          </div>
+          <Toggle
+            checked={settings.askWhereToSave}
+            onChange={(checked) => {
+              void updateSettings({ askWhereToSave: checked });
+            }}
+            label="Ask where to save each file"
+          />
+        </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => void save()} disabled={!dirty} loading={saving}>

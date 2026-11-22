@@ -8,7 +8,7 @@ Module 2 (Premium UI) is complete: page/account context, current/bulk/select act
 
 Module 3 (Platform Detection & Media Discovery) is complete: a shared `PlatformAdapter` contract, per-platform page type and account detection, normalized metadata (post id/date/source/formats/status), supported download options, graceful failure handling, and dedicated detection/metadata tests.
 
-The download queue from the previously approved full v1 build is preserved and unchanged; **no new media-downloading engine was added**. Module 3 extended the platform adapters, and Module 2 added the UI surfaces.
+Module 4 (Single Media Download System) is complete: a platform-independent `DownloadService` with typed states, Chrome-confirmed completion, real byte progress, pause/resume, cancellation, retry, Save As folder choice, duplicate handling, local history, and startup reconciliation. The engine uses Chrome's Downloads API directly and never proxies media.
 
 ## 2. Runtime topology
 
@@ -32,7 +32,8 @@ The download queue from the previously approved full v1 build is preserved and u
 │   ├─ runRequest() error/response boundary                                   │
 │   └─ handlers: scan · sites · history · downloads                           │
 │  services/permissions.ts   dynamic content-script registration              │
-│  downloads/queue.ts        chrome.downloads orchestration (later module)    │
+│  downloads/service.ts      typed download engine + Chrome Downloads         │
+│  downloads/queue.ts        background/UI compatibility facade               │
 │  storage/*                 chrome.storage.local + IndexedDB                 │
 └──────────────────────────────────┬──────────────────────────────────────────┘
                                    │ chrome.tabs.sendMessage / executeScript
@@ -68,7 +69,7 @@ The download queue from the previously approved full v1 build is preserved and u
 | `src/mocks/` | UI-only sample data and preview preferences; never imports download services |
 | `src/services/` | Messaging, permissions, tabs, scan orchestration, centralized error boundary, page navigation |
 | `src/adapters/` | Platform URL matching/extraction + shared DOM helpers |
-| `src/downloads/` | Filename safety, Chrome Downloads client, concurrency queue (later module) |
+| `src/downloads/` | `DownloadService` engine, Chrome Downloads client, safe filenames, queue facade |
 | `src/storage/` | Settings/sites in `chrome.storage.local`, history in IndexedDB |
 | `src/types/` | Strict contracts and typed message unions |
 | `src/utils/` | URL, filename, format, ID, debounce, errors, logging |
@@ -202,7 +203,35 @@ Two plain Vite builds produce one loadable folder:
 | `npm run icons` | Rasterize the SVG mark into 16/32/48/128 PNGs |
 | `npm run typecheck` / `lint` / `test:run` | Individual quality gates |
 
-## 10. UI data modes
+## 10. Download engine
+
+`src/downloads/service.ts` exports `DownloadService` and the singleton used by the background.
+
+```ts
+enqueue(source, { autoStart? }) // pending job + optional history row
+start(id?)                      // start one pending job or drain up to concurrency
+pause(id) / resume(id)          // Chrome pause/resume when supported
+cancel(id)                      // pending or in-flight cancellation
+retry(id)                       // failed/cancelled -> fresh pending attempt
+getStatus(id)                   // typed DownloadRecord
+getHistory(limit?)              // session + persisted history merged
+```
+
+**Typed states:** `pending → downloading → completed | failed | cancelled`. Pause is a `paused` flag on a downloading record, not a separate state.
+
+**Browser-confirmed completion:** the engine never sets `completed` from a timer or from starting the download. It only finalizes on Chrome's `state === "complete"` event or a fresh `downloads.search` result. Progress comes exclusively from `bytesReceived`/`totalBytes` during a 700 ms poll and is capped at 99% until Chrome confirms completion. If Chrome does not report a total, the UI shows an indeterminate bar.
+
+**Cancellation:** pending jobs are cancelled in memory. In-flight jobs call `chrome.downloads.cancel`; `USER_CANCELED` maps to cancelled, while a download Chrome already completed stays completed.
+
+**Retry:** failed/cancelled records reuse their history id and source, regenerate a safe filename, and start a new Chrome download. Expired URLs result in actionable failure messages; they are never rewritten or guessed.
+
+**Destination and duplicates:** `saveAs` is driven by Settings → Downloads → Ask where to save each file; otherwise Chrome uses the default download folder plus the configured subfolder. Filenames are sanitized and `conflictAction: 'uniquify'` prevents overwrites.
+
+**Reconciliation:** on startup, active history rows are searched in Chrome. In-progress downloads are reattached to polling, completed rows are finalized with byte counts, and missing/interrupted rows become failed with a clear message.
+
+**Independence:** the service imports shared types, Chrome client wrappers, filename helpers, and local storage only. It never imports a platform adapter.
+
+## 11. UI data modes
 
 The UI reads through hooks that expose either live or demo data:
 
@@ -215,7 +244,7 @@ The UI reads through hooks that expose either live or demo data:
 
 `Settings.demoMode` (default `false`) switches between them. Mock data and preview preferences are confined to `src/mocks/`; no production module imports a mock queue or mock downloader. Turning the mode off restores live behavior without touching stored history or settings.
 
-## 11. Extension points
+## 12. Extension points
 
 **Add a platform adapter**
 
@@ -237,7 +266,7 @@ Use a versioned envelope in `chrome.storage.local`, or add an IndexedDB object s
 
 Build the component with explicit props, add it to a page entry in `vite.config.ts`, then wire live and mock controllers behind a `demoMode` branch. Keep sample data in `src/mocks/` and never import download services into it.
 
-## 12. Local development
+## 13. Local development
 
 See [README.md](../README.md#install-and-build). Short version:
 
@@ -247,20 +276,21 @@ npm run build
 # chrome://extensions → Developer mode → Load unpacked → dist/
 ```
 
-## 13. Verification
+## 14. Verification
 
 - Strict TypeScript across `src/` and build configs.
 - ESLint 9 with React hooks rules.
-- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, storage, queue, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
+- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, download service states/progress/pause/cancel/retry/Save As/duplicates, queue integration, storage, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
 - `verify-dist.mjs` checks the built package as Chrome would consume it, including all five HTML surfaces.
 
 Live Chrome E2E against real social pages has **not** been run in this environment. The manual QA matrix is in the README.
 
-## 14. Privacy boundaries
+## 15. Privacy boundaries
 
 - No backend, analytics, telemetry, remote fonts, or remote code.
 - No cookies, credentials, private messages, or auth tokens.
 - Media URLs are read from the page; signed URLs are never modified or forged.
+- Downloads are fetched by Chrome directly from the permitted media URL; nothing is proxied or uploaded.
 - Platform thumbnails load directly from the platform CDN with `referrerPolicy="no-referrer"`; nothing is proxied.
 - Demo thumbnails are local SVG data URIs and demo actions never call Chrome Downloads.
 - Private/restricted content is reported as a limitation, never bypassed.

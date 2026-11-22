@@ -32,6 +32,32 @@ export async function cancelDownload(downloadId: number): Promise<void> {
   }
 }
 
+export async function pauseDownload(downloadId: number): Promise<boolean> {
+  if (typeof chrome.downloads.pause !== 'function') {
+    return false;
+  }
+
+  try {
+    await chrome.downloads.pause(downloadId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function resumeDownload(downloadId: number): Promise<boolean> {
+  if (typeof chrome.downloads.resume !== 'function') {
+    return false;
+  }
+
+  try {
+    await chrome.downloads.resume(downloadId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function showDownload(downloadId: number): Promise<boolean> {
   try {
     await chrome.downloads.show(downloadId);

@@ -8,6 +8,7 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 
 - [Architecture](./docs/ARCHITECTURE.md) — module boundaries, messaging, errors, storage, permissions, build pipeline
 - [Platform adapters](./docs/ADAPTERS.md) — detection, account identity, metadata, formats, resilience
+- [Download engine](./docs/DOWNLOADS.md) — service API, states, progress, cancellation, retry, folder choice
 - [UI guide](./docs/UI.md) — design system, surfaces, components, demo mode and the mock boundary
 - [Privacy policy](./PRIVACY.md)
 - [Module status](#module-status)
@@ -17,8 +18,9 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 - **Module 1 — Extension Foundation:** complete. MV3 skeleton, build pipeline, shared types, typed messaging, centralized error boundary, and package verifier.
 - **Module 2 — Premium MediaVault UI:** complete. Popup, side panel, settings, full history page, account selection page, bulk selection toolbar, queue/progress interface, empty/error states, and toasts. A clearly isolated demo-data mode makes every surface reviewable without touching real downloads.
 - **Module 3 — Platform Detection & Media Discovery:** complete. A shared `PlatformAdapter` contract, per-platform page type/account detection, normalized metadata (post id/date/source/formats/status), download options, graceful failure handling, and dedicated detection/metadata tests.
+- **Module 4 — Single Media Download System:** complete. A platform-independent `DownloadService` with typed states, Chrome-confirmed completion, real byte progress, pause/resume, cancellation, retry, Save As folder choice, duplicate handling, history persistence, and startup reconciliation.
 
-The repository also contains the download queue from the previously approved full v1 build. It is preserved so working behavior is not lost. No new download engine was added; in demo mode every download action is simulated by `src/mocks/`.
+All downloads use Chrome's Downloads API directly. No media is uploaded, proxied, or fetched through an external server.
 
 ## What it does
 
@@ -26,7 +28,8 @@ The repository also contains the download queue from the previously approved ful
 - Detects the platform, page type, and visible account for Instagram, Facebook, and TikTok.
 - Extracts direct media URLs and permitted metadata from rendered DOM and public embedded page data.
 - Reports supported formats and availability without assuming every platform exposes the same fields.
-- Queues downloads through Chrome's Downloads API with safe filenames and platform subfolders.
+- Downloads one media file per job through Chrome's Downloads API with safe filenames, duplicate handling, real progress, pause/resume, cancellation, and retry.
+- Lets Chrome prompt for a destination folder (Save As) or uses the configured local subfolder.
 - Tracks local download history in IndexedDB with a side-panel library and a full history page.
 - Shows page/account context, current/bulk download actions, a select mode, and a live queue preview.
 - Offers a per-platform account-selection preview and a fully mock-driven interface preview.
@@ -91,7 +94,9 @@ This watches both Vite builds into `dist/`. Reload the extension from `chrome://
 2. Click the MediaVault toolbar icon.
 3. Click **Enable on this site** once. Chrome asks you to confirm site access.
 4. Scan runs automatically. Use **Download current**, **Bulk download**, or **Start select** for granular selection.
-5. Open **Library** in the side panel to review, retry, reveal, or remove entries; open the full **History** and **Accounts** pages from the header or footer.
+5. Open **Library** in the side panel to watch real Chrome progress, cancel, retry, reveal, or remove entries; open the full **History** and **Accounts** pages from the header or footer.
+
+To choose the destination folder yourself, enable **Settings → Downloads → Ask where to save each file**. Chrome then shows its native Save As dialog for every download. Otherwise Chrome saves to your default download folder plus the configured subfolder.
 
 Site access is stored per platform. Revoke it in Settings → Site access.
 
@@ -123,7 +128,7 @@ src/
   mocks/             UI-only sample accounts/media/queue/history/preview preferences
   adapters/          PlatformAdapter contract, base pipeline, metadata normalization
     instagram/ facebook/ tiktok/   adapter + page-type + account + extraction
-  downloads/         Filename builder, Chrome Downloads client, concurrency queue
+  downloads/         DownloadService engine, Chrome client, safe filename builder, queue facade
   storage/           chrome.storage settings/sites + IndexedDB history
   types/             Strict shared contracts, message unions, UI contracts
   utils/             URL, filename, page context, status, formatting, errors, logging
@@ -148,6 +153,21 @@ getDownloadOptions(item)
 Detected page types: profile, feed, single post, video/reel, story, highlight, tagged posts, and saved collections where the platform exposes them. Each `MediaItem` carries platform, account username/identity, media type, direct URL, thumbnail, caption, post date, post id, source page URL, formats, and download status.
 
 Platforms expose different fields; missing values stay undefined rather than being invented. Selectors use layered fallbacks, and extraction failures return a warning instead of throwing. Login walls, private content, and adaptive streams are reported as restrictions — never bypassed. See [docs/ADAPTERS.md](./docs/ADAPTERS.md).
+
+### Download engine
+
+`DownloadService` is independent of platform adapters:
+
+```ts
+enqueue(source) → pending
+start()         → downloading
+pause()/resume() // when Chrome supports it
+cancel()        → cancelled
+retry()         → fresh pending attempt from the same source
+getStatus() / getHistory()
+```
+
+Typed states: `pending`, `downloading`, `completed`, `failed`, `cancelled`. Completion is set **only after Chrome reports `state === "complete"`**. Progress comes only from Chrome's byte counters (capped at 99% until confirmation); there is no simulated progress. Failed network/expired-URL errors are translated into actionable messages and never retried as a success. See [docs/DOWNLOADS.md](./docs/DOWNLOADS.md).
 
 ### Build design
 
@@ -182,14 +202,17 @@ Known limits (also shown in-product):
 1. There are no official download APIs for these platforms; extraction uses rendered pages and embedded public state.
 2. Private accounts, login walls, age gates, and region restrictions are unsupported by design.
 3. MSE/DASH/blob videos have no direct file link and cannot be saved.
-4. Signed CDN URLs expire — download while the page is open.
-5. Carousels/slideshows include only rendered slides.
-6. Profile/feed crawling is intentionally absent.
-7. Page type/account/date detection depends on what the platform exposes; unavailable fields remain empty.
-8. Stories, highlights, tagged posts, and saved collections are scanned only when the content is already visible/accessible.
-9. Chrome 116+ desktop only.
-10. Platform DOM changes can break extraction until adapters are updated.
-11. Chrome Web Store review may scrutinize social downloader extensions; use is limited to content you are authorized to save.
+4. Signed CDN URLs expire — download while the page is open. Retry may still fail until the page is rescanned.
+5. Progress is shown only when Chrome reports byte totals; otherwise the UI uses an indeterminate bar.
+6. Pause/resume depends on Chrome supporting it for that download.
+7. “Ask where to save” prompts once per file; multi-file queues may show multiple dialogs.
+8. Carousels/slideshows include only rendered slides.
+9. Profile/feed crawling is intentionally absent.
+10. Page type/account/date detection depends on what the platform exposes; unavailable fields remain empty.
+11. Stories, highlights, tagged posts, and saved collections are scanned only when the content is already visible/accessible.
+12. Chrome 116+ desktop only.
+13. Platform DOM changes can break extraction until adapters are updated.
+14. Chrome Web Store review may scrutinize social downloader extensions; use is limited to content you are authorized to save.
 
 ## Testing and verification
 
@@ -198,11 +221,11 @@ Verified in this repository:
 ```bash
 npm run typecheck   # strict TypeScript, app + configs
 npm run lint        # ESLint, zero warnings/errors
-npm run test:run    # 114 tests passing
+npm run test:run    # 127 tests passing
 npm run build       # loadable dist/ + manifest/package verification
 ```
 
-Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, filename safety, URL normalization, settings/history/sites storage, the download queue (start, completion, failure, cancellation, history-off), typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
+Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, the download service (pending/downloading/completed/failed/cancelled, browser-confirmed completion, byte progress, pause/resume, cancellation, retry, Save As, duplicates, typed history), filename safety, URL normalization, settings/history/sites storage, typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
 
 **Not yet verified here:** live end-to-end downloads against Instagram, Facebook, and TikTok. That requires loading `dist/` in Chrome and testing with real pages you are authorized to access. The manual QA checklist:
 
@@ -214,8 +237,10 @@ Coverage includes platform/page/account detection, metadata normalization, forma
 - Account selection persists and the popup page-context card reflects the chosen mock account.
 - Full history page shows stats, filters, empty state, and clear confirmation.
 - Side panel switches between Library and Queue; footer links open history/accounts/settings.
+- A real download shows browser byte progress; completion appears only after Chrome finishes.
+- Cancel works for queued and in-flight jobs; retry restarts a failed job; Save As opens Chrome's folder picker.
+- Expired links fail with a rescan message rather than a false success.
 - Blob-only video shows a limitation and no unsafe attempt.
-- Cancel/retry/failure flows update the library.
 - Revoking access removes the content script and restores the gate.
 - Keyboard-only navigation, 320px side panel, and reduced-motion behavior.
 

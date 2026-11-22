@@ -16,6 +16,7 @@ export interface HistoryListProps {
   onLoadMore: () => void;
   onReveal: (entry: HistoryEntry) => void;
   onRetry: (entry: HistoryEntry) => void;
+  onCancel: (entry: HistoryEntry) => void;
   onDelete: (entry: HistoryEntry) => void;
 }
 
@@ -29,6 +30,7 @@ export function HistoryList({
   onLoadMore,
   onReveal,
   onRetry,
+  onCancel,
   onDelete,
 }: HistoryListProps) {
   if (loading && entries.length === 0) {
@@ -70,6 +72,7 @@ export function HistoryList({
             entry={entry}
             onReveal={onReveal}
             onRetry={onRetry}
+            onCancel={onCancel}
             onDelete={onDelete}
           />
         ))}

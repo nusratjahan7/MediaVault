@@ -75,6 +75,14 @@ Rules enforced by design:
 - **Error:** scan failure, queue unavailable, history fetch failure, permission rejection.
 - **Success:** toasts for preview actions, settings saves, account selection, and live download queueing.
 
+## Live download feedback
+
+- Queue rows show Chrome-reported percentage progress and byte counts; no percentage is invented. If Chrome has no total size, the row uses an indeterminate bar.
+- Status labels include Pending/Queued, Downloading, Paused, Saved, Failed, Cancelled.
+- Active rows expose **Cancel**; failed/cancelled rows expose **Retry** through the download service.
+- Full history rows show bytes received / total bytes when Chrome reports them.
+- **Ask where to save each file** in Settings hands folder selection to Chrome's native Save As dialog.
+
 ## Accessibility and responsiveness
 
 - Native buttons/inputs, ARIA labels on icon-only controls, `aria-pressed`, `role="switch"`, `role="radiogroup"`, and `role="toolbar"`.

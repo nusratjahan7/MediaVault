@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS: Settings = {
   historyEnabled: true,
   maxHistoryEntries: 500,
   demoMode: false,
+  askWhereToSave: false,
 };
 
 interface SettingsEnvelope {
@@ -74,6 +75,10 @@ export function coerceSettings(value: unknown): Settings {
     historyEnabled: coerceBoolean(value.historyEnabled, DEFAULT_SETTINGS.historyEnabled),
     maxHistoryEntries: coerceHistoryLimit(value.maxHistoryEntries),
     demoMode: coerceBoolean(value.demoMode, DEFAULT_SETTINGS.demoMode),
+    askWhereToSave: coerceBoolean(
+      value.askWhereToSave,
+      DEFAULT_SETTINGS.askWhereToSave,
+    ),
   };
 }
 

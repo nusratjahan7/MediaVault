@@ -38,6 +38,7 @@ export interface QueuePreviewItem {
   filename: string;
   status: DownloadStatus;
   progress?: number;
+  paused?: boolean;
   thumbnailUrl?: string;
   sizeLabel?: string;
   error?: string;

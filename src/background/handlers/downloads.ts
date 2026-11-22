@@ -1,6 +1,11 @@
 import { cancelQueuedDownload, enqueueDownloads } from '@/downloads/queue';
+import { downloadService } from '@/downloads/service';
 import type { EnqueueResult } from '@/types/download';
-import type { CancelDownloadRequest, DownloadItemsRequest } from '@/types/messages';
+import type {
+  CancelDownloadRequest,
+  DownloadItemsRequest,
+  RetryDownloadRequest,
+} from '@/types/messages';
 import { AppError } from '@/utils/errors';
 
 export async function handleDownloadItems({
@@ -21,4 +26,14 @@ export async function handleCancelDownload({
   }
 
   return { cancelled: await cancelQueuedDownload(historyId) };
+}
+
+export async function handleRetryDownload({
+  historyId,
+}: RetryDownloadRequest): Promise<{ retried: boolean }> {
+  if (!historyId) {
+    throw new AppError('INVALID_INPUT', 'A download id is required.');
+  }
+
+  return { retried: await downloadService.retry(historyId) };
 }

@@ -1,7 +1,11 @@
 import { runRequest } from '@/services/error-handler';
 import type { ApiResponse, BackgroundRequest } from '@/types/messages';
 import { AppError } from '@/utils/errors';
-import { handleCancelDownload, handleDownloadItems } from './handlers/downloads';
+import {
+  handleCancelDownload,
+  handleDownloadItems,
+  handleRetryDownload,
+} from './handlers/downloads';
 import {
   handleHistoryClear,
   handleHistoryDelete,
@@ -14,6 +18,7 @@ const REQUEST_TYPES = new Set<string>([
   'SCAN_TAB',
   'DOWNLOAD_ITEMS',
   'CANCEL_DOWNLOAD',
+  'RETRY_DOWNLOAD',
   'HISTORY_QUERY',
   'HISTORY_DELETE',
   'HISTORY_CLEAR',
@@ -40,6 +45,8 @@ async function dispatch(request: BackgroundRequest): Promise<ApiResponse<unknown
         return handleDownloadItems(request);
       case 'CANCEL_DOWNLOAD':
         return handleCancelDownload(request);
+      case 'RETRY_DOWNLOAD':
+        return handleRetryDownload(request);
       case 'HISTORY_QUERY':
         return handleHistoryQuery(request);
       case 'HISTORY_DELETE':

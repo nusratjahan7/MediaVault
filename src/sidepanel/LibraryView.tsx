@@ -70,18 +70,19 @@ export function LibraryView({
 
     try {
       const response = await sendToBackground({
-        type: 'DOWNLOAD_ITEMS',
-        items: [entry.item],
+        type: 'RETRY_DOWNLOAD',
+        historyId: entry.id,
       });
 
       if (!response.ok) {
         throw fromErrorPayload(response.error);
       }
 
-      if (response.data.accepted.length === 0) {
+      if (!response.data.retried) {
         toast({
-          title: 'No direct link',
-          description: 'Open the original page and scan again for a fresh link.',
+          title: 'Could not retry',
+          description:
+            'Only failed or cancelled downloads can be retried. If the media URL expired, open the page and scan again.',
           variant: 'error',
         });
         return;
@@ -89,11 +90,43 @@ export function LibraryView({
 
       toast({
         title: 'Download queued',
-        description: 'A fresh download was added to the queue.',
+        description: 'The existing entry was restarted with a fresh browser download.',
         variant: 'success',
       });
     } catch (caught) {
       toast({ title: 'Could not retry', description: getErrorMessage(caught), variant: 'error' });
+    }
+  };
+
+  const handleCancel = async (entry: HistoryEntry) => {
+    if (mode === 'demo') {
+      toast({
+        title: 'Preview only',
+        description: 'Demo mode does not control a real download.',
+        variant: 'default',
+      });
+      return;
+    }
+
+    try {
+      const response = await sendToBackground({
+        type: 'CANCEL_DOWNLOAD',
+        historyId: entry.id,
+      });
+
+      if (!response.ok) {
+        throw fromErrorPayload(response.error);
+      }
+
+      toast({
+        title: response.data.cancelled ? 'Cancelling download' : 'Download already finished',
+        description: response.data.cancelled
+          ? 'Chrome will confirm the cancellation.'
+          : 'The file completed before the cancellation request.',
+        variant: response.data.cancelled ? 'success' : 'default',
+      });
+    } catch (caught) {
+      toast({ title: 'Could not cancel', description: getErrorMessage(caught), variant: 'error' });
     }
   };
 
@@ -181,6 +214,9 @@ export function LibraryView({
           }}
           onRetry={(entry) => {
             void handleRetry(entry);
+          }}
+          onCancel={(entry) => {
+            void handleCancel(entry);
           }}
           onDelete={(entry) => {
             void handleDelete(entry);

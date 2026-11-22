@@ -1,4 +1,5 @@
-import type { MediaItem } from '@/types/media';
+import type { MediaKind } from '@/types/media';
+import type { PlatformId } from '@/types/platform';
 import type { Settings } from '@/types/settings';
 import {
   ensureFileExtension,
@@ -7,7 +8,15 @@ import {
 } from '@/utils/filename';
 import { extensionFromUrl } from '@/utils/url';
 
-export function inferExtension(item: MediaItem): string {
+export interface DownloadPathSource {
+  id: string;
+  platform: PlatformId;
+  kind: MediaKind;
+  url: string;
+  author?: string;
+}
+
+export function inferExtension(item: DownloadPathSource): string {
   const fromUrl = extensionFromUrl(item.url);
   if (fromUrl) {
     return fromUrl;
@@ -17,7 +26,7 @@ export function inferExtension(item: MediaItem): string {
 }
 
 export function buildDownloadPath(
-  item: MediaItem,
+  item: DownloadPathSource,
   settings: Pick<Settings, 'downloadSubfolder' | 'filenameTemplate'>,
 ): string {
   const extension = inferExtension(item);

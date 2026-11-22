@@ -180,6 +180,25 @@ export const chromeMock = {
       if (item) {
         item.state = 'interrupted';
         item.error = 'USER_CANCELED';
+        downloadsOnChanged.emit({
+          id: downloadId,
+          state: { current: 'interrupted' },
+          error: { current: 'USER_CANCELED' },
+        });
+      }
+    }),
+    pause: vi.fn(async (downloadId: number) => {
+      const item = downloadItems.get(downloadId);
+      if (item) {
+        item.paused = true;
+        downloadsOnChanged.emit({ id: downloadId, paused: { current: true } });
+      }
+    }),
+    resume: vi.fn(async (downloadId: number) => {
+      const item = downloadItems.get(downloadId);
+      if (item) {
+        item.paused = false;
+        downloadsOnChanged.emit({ id: downloadId, paused: { current: false } });
       }
     }),
     show: vi.fn(async () => undefined),
@@ -315,6 +334,10 @@ export function getLastDownloadId(): number | undefined {
   return ids.at(-1);
 }
 
+export function getDownloadIds(): number[] {
+  return [...downloadItems.keys()];
+}
+
 export function getLastDownloadOptions(): chrome.downloads.DownloadOptions | undefined {
   const id = getLastDownloadId();
   return id === undefined ? undefined : downloadOptions.get(id);
@@ -328,7 +351,24 @@ export function completeDownload(downloadId: number): void {
 
   item.state = 'complete';
   item.exists = true;
+  if (item.totalBytes > 0) {
+    item.bytesReceived = item.totalBytes;
+  }
   downloadsOnChanged.emit({ id: downloadId, state: { current: 'complete' } });
+}
+
+export function setDownloadProgress(
+  downloadId: number,
+  bytesReceived: number,
+  totalBytes: number,
+): void {
+  const item = downloadItems.get(downloadId);
+  if (!item) {
+    return;
+  }
+
+  item.bytesReceived = bytesReceived;
+  item.totalBytes = totalBytes;
 }
 
 export function failDownload(

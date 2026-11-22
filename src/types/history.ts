@@ -16,6 +16,8 @@ export interface HistoryEntry {
   status: DownloadStatus;
   downloadId?: number;
   bytesReceived?: number;
+  totalBytes?: number;
+  paused?: boolean;
   error?: string;
   createdAt: number;
   updatedAt: number;

@@ -86,6 +86,15 @@ describe('background message router', () => {
     expect(chromeMock.downloads.download).not.toHaveBeenCalled();
   });
 
+  it('routes retry requests through the download service', async () => {
+    const response = await dispatch({
+      type: 'RETRY_DOWNLOAD',
+      historyId: 'missing-download',
+    });
+
+    expect(response).toEqual({ ok: true, data: { retried: false } });
+  });
+
   it('reports every platform as disabled before access is granted', async () => {
     const response = await dispatch({ type: 'SITES_STATUS' });
 

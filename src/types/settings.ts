@@ -8,4 +8,5 @@ export interface Settings {
   historyEnabled: boolean;
   maxHistoryEntries: number;
   demoMode: boolean;
+  askWhereToSave: boolean;
 }

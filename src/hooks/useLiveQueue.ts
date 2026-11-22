@@ -13,12 +13,28 @@ const MAX_VISIBLE_ITEMS = 8;
 const RECENT_FINISHED_ITEMS = 2;
 
 function toPreviewItem(entry: HistoryEntry): QueuePreviewItem {
+  const totalBytes =
+    entry.totalBytes && entry.totalBytes > 0 ? entry.totalBytes : undefined;
   const progress =
-    entry.status === 'completed' ? 100 : entry.status === 'queued' ? 0 : undefined;
+    entry.status === 'completed'
+      ? 100
+      : entry.status === 'queued'
+        ? 0
+        : entry.status === 'downloading' &&
+            totalBytes !== undefined &&
+            entry.bytesReceived !== undefined
+          ? Math.min(99, Math.round((entry.bytesReceived / totalBytes) * 100))
+          : undefined;
   const dimensions =
     entry.item.width && entry.item.height
       ? `${entry.item.width}×${entry.item.height}`
       : undefined;
+  const sizeLabel =
+    entry.bytesReceived && totalBytes
+      ? `${formatBytes(entry.bytesReceived)} / ${formatBytes(totalBytes)}`
+      : entry.bytesReceived
+        ? formatBytes(entry.bytesReceived)
+        : dimensions;
 
   return {
     id: entry.id,
@@ -27,8 +43,9 @@ function toPreviewItem(entry: HistoryEntry): QueuePreviewItem {
     filename: entry.filename.split('/').pop() ?? entry.filename,
     status: entry.status,
     progress,
+    paused: entry.paused,
     thumbnailUrl: entry.item.thumbnailUrl,
-    sizeLabel: entry.bytesReceived ? formatBytes(entry.bytesReceived) : dimensions,
+    sizeLabel,
     error: entry.error,
     createdAt: entry.createdAt,
   };

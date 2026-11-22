@@ -25,6 +25,11 @@ export interface CancelDownloadRequest {
   historyId: string;
 }
 
+export interface RetryDownloadRequest {
+  type: 'RETRY_DOWNLOAD';
+  historyId: string;
+}
+
 export interface HistoryQueryRequest {
   type: 'HISTORY_QUERY';
   query: HistoryQuery;
@@ -58,6 +63,7 @@ export type BackgroundRequest =
   | ScanTabRequest
   | DownloadItemsRequest
   | CancelDownloadRequest
+  | RetryDownloadRequest
   | HistoryQueryRequest
   | HistoryDeleteRequest
   | HistoryClearRequest
@@ -69,6 +75,7 @@ export interface BackgroundPayloadMap {
   SCAN_TAB: ScanResult;
   DOWNLOAD_ITEMS: EnqueueResult;
   CANCEL_DOWNLOAD: { cancelled: boolean };
+  RETRY_DOWNLOAD: { retried: boolean };
   HISTORY_QUERY: HistoryPage;
   HISTORY_DELETE: { deleted: boolean };
   HISTORY_CLEAR: { cleared: number };

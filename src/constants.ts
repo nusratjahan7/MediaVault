@@ -17,7 +17,7 @@ export const CONTENT_SCRIPT_ID_PREFIX = 'mediavault-content-';
 
 export const MESSAGE_TIMEOUT_MS = 10_000;
 export const SCAN_TIMEOUT_MS = 12_000;
-export const DOWNLOAD_CONCURRENCY = 2;
+export const DOWNLOAD_CONCURRENCY = 1;
 export const MAX_SCAN_ITEMS = 200;
 export const MIN_IMAGE_SIZE = 150;
 export const MAX_FILENAME_LENGTH = 120;

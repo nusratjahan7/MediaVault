@@ -81,4 +81,10 @@ describe('settings storage', () => {
     expect((await saveSettings({ demoMode: true })).demoMode).toBe(true);
     expect((await getSettings(true)).demoMode).toBe(true);
   });
+
+  it('persists the Save As preference', async () => {
+    expect((await getSettings()).askWhereToSave).toBe(false);
+    expect((await saveSettings({ askWhereToSave: true })).askWhereToSave).toBe(true);
+    expect((await getSettings(true)).askWhereToSave).toBe(true);
+  });
 });

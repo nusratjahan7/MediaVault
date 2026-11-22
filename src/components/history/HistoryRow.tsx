@@ -5,6 +5,7 @@ import {
   RotateCcw,
   Trash2,
   Video,
+  X,
 } from 'lucide-react';
 import type { HistoryEntry } from '@/types/history';
 import { cn } from '@/utils/cn';
@@ -18,14 +19,26 @@ export interface HistoryRowProps {
   entry: HistoryEntry;
   onReveal: (entry: HistoryEntry) => void;
   onRetry: (entry: HistoryEntry) => void;
+  onCancel: (entry: HistoryEntry) => void;
   onDelete: (entry: HistoryEntry) => void;
 }
 
-export function HistoryRow({ entry, onReveal, onRetry, onDelete }: HistoryRowProps) {
+export function HistoryRow({
+  entry,
+  onReveal,
+  onRetry,
+  onCancel,
+  onDelete,
+}: HistoryRowProps) {
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
-  const meta = STATUS_META[entry.status];
+  const meta =
+    entry.paused && entry.status === 'downloading'
+      ? { label: 'Paused', tone: 'warning' as const, active: true }
+      : STATUS_META[entry.status];
   const thumbnail = entry.item.thumbnailUrl;
   const canReveal = entry.status === 'completed' && entry.downloadId !== undefined;
+  const canCancel =
+    entry.status === 'queued' || entry.status === 'downloading';
   const canRetry =
     entry.status === 'failed' ||
     entry.status === 'interrupted' ||
@@ -63,6 +76,15 @@ export function HistoryRow({ entry, onReveal, onRetry, onDelete }: HistoryRowPro
             {entry.filename.split('/').pop() ?? entry.filename}
           </p>
           <div className="flex shrink-0 items-center gap-0.5">
+            {canCancel && (
+              <IconButton
+                label="Cancel download"
+                size="sm"
+                onClick={() => onCancel(entry)}
+              >
+                <X className="size-3.5" aria-hidden="true" />
+              </IconButton>
+            )}
             {canReveal && (
               <IconButton
                 label="Show in folder"
@@ -90,7 +112,11 @@ export function HistoryRow({ entry, onReveal, onRetry, onDelete }: HistoryRowPro
             {formatRelativeTime(entry.createdAt)}
           </span>
           {entry.bytesReceived ? (
-            <span className="text-[10px] text-muted">{formatBytes(entry.bytesReceived)}</span>
+            <span className="text-[10px] text-muted">
+              {entry.totalBytes
+                ? `${formatBytes(entry.bytesReceived)} / ${formatBytes(entry.totalBytes)}`
+                : formatBytes(entry.bytesReceived)}
+            </span>
           ) : null}
         </div>
 

@@ -19,7 +19,9 @@ function itemBasename(filename: string): string {
 }
 
 function QueueRow({ item }: { item: QueuePreviewItem }) {
-  const meta = STATUS_META[item.status];
+  const meta = item.paused
+    ? { label: 'Paused', tone: 'warning' as const, active: true }
+    : STATUS_META[item.status];
   const active = meta.active;
   const progress = item.progress;
 

@@ -88,8 +88,8 @@ export function App() {
 
     try {
       const response = await sendToBackground({
-        type: 'DOWNLOAD_ITEMS',
-        items: [entry.item],
+        type: 'RETRY_DOWNLOAD',
+        historyId: entry.id,
       });
 
       if (!response.ok) {
@@ -97,19 +97,50 @@ export function App() {
       }
 
       toast({
-        title:
-          response.data.accepted.length > 0
-            ? 'Download queued'
-            : 'No direct link available',
-        description:
-          response.data.accepted.length > 0
-            ? 'A fresh download was added to the queue.'
-            : 'Open the original page and scan again for a fresh link.',
-        variant: response.data.accepted.length > 0 ? 'success' : 'error',
+        title: response.data.retried ? 'Download queued' : 'Could not retry',
+        description: response.data.retried
+          ? 'The existing entry was restarted with a fresh browser download.'
+          : 'Only failed or cancelled downloads can be retried. If the link expired, scan the page again.',
+        variant: response.data.retried ? 'success' : 'error',
       });
     } catch (caught) {
       toast({
         title: 'Could not retry',
+        description: getErrorMessage(caught),
+        variant: 'error',
+      });
+    }
+  };
+
+  const handleCancel = async (entry: HistoryEntry) => {
+    if (demo) {
+      toast({
+        title: 'Preview only',
+        description: 'Demo mode does not control a real download.',
+      });
+      return;
+    }
+
+    try {
+      const response = await sendToBackground({
+        type: 'CANCEL_DOWNLOAD',
+        historyId: entry.id,
+      });
+
+      if (!response.ok) {
+        throw fromErrorPayload(response.error);
+      }
+
+      toast({
+        title: response.data.cancelled ? 'Cancelling download' : 'Download already finished',
+        description: response.data.cancelled
+          ? 'Chrome will confirm the cancellation.'
+          : 'The file completed before the cancellation request.',
+        variant: response.data.cancelled ? 'success' : 'default',
+      });
+    } catch (caught) {
+      toast({
+        title: 'Could not cancel',
         description: getErrorMessage(caught),
         variant: 'error',
       });
@@ -231,6 +262,9 @@ export function App() {
           }}
           onRetry={(entry) => {
             void handleRetry(entry);
+          }}
+          onCancel={(entry) => {
+            void handleCancel(entry);
           }}
           onDelete={(entry) => {
             void handleDelete(entry);

@@ -1,0 +1,271 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { DownloadService } from '@/downloads/service';
+import { saveSettings } from '@/storage/settings';
+import type { DownloadRecord, DownloadSource } from '@/types/download';
+import {
+  chromeMock,
+  completeDownload,
+  failDownload,
+  getDownloadIds,
+  getLastDownloadId,
+  getLastDownloadOptions,
+  setDownloadProgress,
+} from '../mocks/chrome';
+
+const SOURCE: DownloadSource = {
+  id: 'instagram_abc12345',
+  platform: 'instagram',
+  kind: 'video',
+  url: 'https://scontent.cdninstagram.com/v/clip.mp4',
+  thumbnailUrl: 'https://scontent.cdninstagram.com/v/poster.jpg',
+  author: 'studio',
+  caption: 'A source clip',
+  postId: 'ABC123',
+  sourcePageUrl: 'https://www.instagram.com/p/ABC123/',
+  downloadStatus: 'available',
+};
+
+let service: DownloadService;
+
+async function waitFor<T>(
+  read: () => Promise<T | undefined> | T | undefined,
+  timeoutMs = 4_000,
+): Promise<T> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const value = await read();
+    if (value !== undefined) {
+      return value;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+
+  throw new Error('Timed out waiting for a condition.');
+}
+
+async function waitForState(
+  id: string,
+  state: DownloadRecord['state'],
+): Promise<DownloadRecord> {
+  return waitFor(async () => {
+    const record = await service.getStatus(id);
+    return record?.state === state ? record : undefined;
+  });
+}
+
+async function waitForAttachedDownload(
+  id: string,
+  downloadId: number,
+): Promise<DownloadRecord> {
+  return waitFor(async () => {
+    const record = await service.getStatus(id);
+    return record?.downloadId === downloadId ? record : undefined;
+  });
+}
+
+beforeEach(() => {
+  service = new DownloadService();
+});
+
+afterEach(() => {
+  service.resetForTests();
+});
+
+describe('DownloadService', () => {
+  it('enqueues a single source as pending without starting or completing it', async () => {
+    const record = await service.enqueue(SOURCE);
+
+    expect(record.state).toBe('pending');
+    expect(record.source.url).toBe(SOURCE.url);
+    expect(record.filename).toMatch(
+      /^MediaVault\/instagram\/instagram-studio-[0-9a-f]{8}\.mp4$/,
+    );
+    expect(chromeMock.downloads.download).not.toHaveBeenCalled();
+    expect((await service.getStatus(record.id))?.state).toBe('pending');
+  });
+
+  it('completes only after Chrome confirms the download', async () => {
+    const record = await service.enqueue(SOURCE);
+    service.start(record.id);
+
+    const downloadId = await waitFor(() => getLastDownloadId());
+    const downloading = await waitForAttachedDownload(record.id, downloadId);
+
+    expect(downloading.state).toBe('downloading');
+    expect(downloading.progress).toBeUndefined();
+    expect(downloading.downloadId).toBe(downloadId);
+
+    const options = getLastDownloadOptions();
+    expect(options).toMatchObject({
+      url: SOURCE.url,
+      conflictAction: 'uniquify',
+      saveAs: false,
+    });
+
+    // No browser completion yet.
+    expect((await service.getStatus(record.id))?.state).toBe('downloading');
+
+    completeDownload(downloadId);
+    const completed = await waitForState(record.id, 'completed');
+
+    expect(completed.progress).toBe(100);
+    expect(completed.downloadId).toBe(downloadId);
+    expect(completed.error).toBeUndefined();
+  });
+
+  it('derives progress only from Chrome bytes', async () => {
+    const record = await service.enqueue(SOURCE);
+    service.start(record.id);
+    const downloadId = await waitFor(() => getLastDownloadId());
+    await waitForAttachedDownload(record.id, downloadId);
+
+    setDownloadProgress(downloadId, 500, 1_000);
+
+    const progressed = await waitFor(async () => {
+      const status = await service.getStatus(record.id);
+      return status?.progress === 50 ? status : undefined;
+    });
+
+    expect(progressed.bytesReceived).toBe(500);
+    expect(progressed.totalBytes).toBe(1_000);
+    expect(progressed.state).toBe('downloading');
+
+    completeDownload(downloadId);
+    const completed = await waitForState(record.id, 'completed');
+    expect(completed.progress).toBe(100);
+    expect(completed.bytesReceived).toBe(1_000);
+  });
+
+  it('pauses and resumes through the Chrome Downloads API when available', async () => {
+    const record = await service.enqueue(SOURCE);
+    service.start(record.id);
+    const downloadId = await waitFor(() => getLastDownloadId());
+    await waitForAttachedDownload(record.id, downloadId);
+
+    await expect(service.pause(record.id)).resolves.toBe(true);
+    expect(chromeMock.downloads.pause).toHaveBeenCalledWith(downloadId);
+    expect((await service.getStatus(record.id))?.paused).toBe(true);
+
+    await expect(service.resume(record.id)).resolves.toBe(true);
+    expect(chromeMock.downloads.resume).toHaveBeenCalledWith(downloadId);
+    expect((await service.getStatus(record.id))?.paused).toBe(false);
+
+    completeDownload(downloadId);
+    await waitForState(record.id, 'completed');
+  });
+
+  it('cancels a pending job without contacting Chrome Downloads', async () => {
+    const record = await service.enqueue(SOURCE);
+
+    await expect(service.cancel(record.id)).resolves.toBe(true);
+    expect((await service.getStatus(record.id))?.state).toBe('cancelled');
+    expect(chromeMock.downloads.download).not.toHaveBeenCalled();
+  });
+
+  it('cancels an in-flight job and waits for Chrome state', async () => {
+    const record = await service.enqueue(SOURCE);
+    service.start(record.id);
+    const downloadId = await waitFor(() => getLastDownloadId());
+    await waitForAttachedDownload(record.id, downloadId);
+
+    await expect(service.cancel(record.id)).resolves.toBe(true);
+    expect(chromeMock.downloads.cancel).toHaveBeenCalledWith(downloadId);
+
+    const cancelled = await waitForState(record.id, 'cancelled');
+    expect(cancelled.progress).not.toBe(100);
+  });
+
+  it('retries a failed job with the same source and a fresh browser download', async () => {
+    const record = await service.enqueue(SOURCE);
+    service.start(record.id);
+    const firstDownloadId = await waitFor(() => getLastDownloadId());
+    await waitForAttachedDownload(record.id, firstDownloadId);
+
+    failDownload(firstDownloadId, 'SERVER_FORBIDDEN');
+    const failed = await waitForState(record.id, 'failed');
+    expect(failed.error).toMatch(/expired/i);
+
+    const callsBefore = chromeMock.downloads.download.mock.calls.length;
+    await expect(service.retry(record.id)).resolves.toBe(true);
+
+    const secondDownloadId = await waitFor(() => {
+      const id = getLastDownloadId();
+      return id !== undefined && id !== firstDownloadId ? id : undefined;
+    });
+    expect(chromeMock.downloads.download.mock.calls.length).toBe(callsBefore + 1);
+
+    const retried = await waitForAttachedDownload(record.id, secondDownloadId);
+    expect(retried.attempts).toBe(1);
+    expect(retried.state).toBe('downloading');
+    expect(retried.state).not.toBe('completed');
+
+    completeDownload(secondDownloadId);
+    await waitForState(record.id, 'completed');
+  });
+
+  it('uses Chrome Save As when the user asks for a folder choice', async () => {
+    await saveSettings({ askWhereToSave: true });
+
+    const record = await service.enqueue(SOURCE);
+    service.start(record.id);
+    const downloadId = await waitFor(() => getLastDownloadId());
+
+    expect(getLastDownloadOptions()?.saveAs).toBe(true);
+
+    completeDownload(downloadId);
+    await waitForState(record.id, 'completed');
+  });
+
+  it('keeps duplicate filenames safe with Chrome uniquify behavior', async () => {
+    await service.enqueue(SOURCE);
+    await service.enqueue(SOURCE);
+    service.start();
+
+    const firstDownloadId = await waitFor(() => getLastDownloadId());
+    completeDownload(firstDownloadId);
+
+    await waitFor(() =>
+      chromeMock.downloads.download.mock.calls.length >= 2 ? true : undefined,
+    );
+
+    const options = chromeMock.downloads.download.mock.calls.map(([value]) => value);
+    const filenames = options
+      .map((option) => ('filename' in option ? option.filename : undefined))
+      .filter((filename): filename is string => typeof filename === 'string');
+
+    expect(filenames).toHaveLength(2);
+    expect(filenames[0]).toBe(filenames[1]);
+    expect(options.every((option) => option.conflictAction === 'uniquify')).toBe(true);
+
+    for (const downloadId of getDownloadIds()) {
+      completeDownload(downloadId);
+    }
+  });
+
+  it('returns typed history from the same service', async () => {
+    const record = await service.enqueue(SOURCE);
+    service.start(record.id);
+    const downloadId = await waitFor(() => getLastDownloadId());
+    await waitForAttachedDownload(record.id, downloadId);
+    completeDownload(downloadId);
+    await waitForState(record.id, 'completed');
+
+    const history = await service.getHistory();
+    const saved = history.find((entry) => entry.id === record.id);
+
+    expect(saved).toBeDefined();
+    expect(saved?.state).toBe('completed');
+    expect(saved?.filename).toBe(record.filename);
+    expect(saved?.source.url).toBe(SOURCE.url);
+  });
+
+  it('rejects sources without a permitted direct URL', async () => {
+    await expect(
+      service.enqueue({ ...SOURCE, url: 'blob:https://www.instagram.com/1' }),
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    await expect(
+      service.enqueue({ ...SOURCE, downloadStatus: 'restricted' }),
+    ).rejects.toMatchObject({ code: 'DOWNLOAD_FAILED' });
+  });
+});

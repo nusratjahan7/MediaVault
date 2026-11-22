@@ -10,10 +10,10 @@ MediaVault is designed to work entirely on your device. There is no MediaVault s
 
 | Storage | Contents | Purpose |
 | --- | --- | --- |
-| `chrome.storage.local` (`mediavault:settings:v1`) | Theme, download folder, filename template, auto-scan, history preferences, demo-mode flag | Keep your preferences |
+| `chrome.storage.local` (`mediavault:settings:v1`) | Theme, download folder, filename template, auto-scan, history preferences, demo-mode flag, Save-As preference | Keep your preferences |
 | `chrome.storage.local` (`mediavault:sites:v1`) | Platforms you enabled | Restore site access after a restart |
 | `chrome.storage.local` (`mediavault:preview:accounts:v1`) | Mock preview account IDs only | Remember the UI-preview account per platform |
-| IndexedDB `mediavault` → `history` | Filename, platform, status, media URL, thumbnail URL, timestamps, optional bytes/error | Local download library |
+| IndexedDB `mediavault` → `history` | Filename, platform, status, media URL, thumbnail URL, timestamps, optional bytes/total/paused/error | Local download library |
 
 Nothing in this storage is uploaded anywhere. Only extension pages and the service worker can read it.
 
@@ -32,7 +32,7 @@ MediaVault never requests Chrome's `cookies` permission and does not read passwo
 
 - The extension itself makes **no network requests** to MediaVault or any analytics service.
 - Thumbnails in the popup and library load directly from the platform CDN URLs present on the page, with `referrerPolicy="no-referrer"`. This reveals your IP to the platform, as any image request would.
-- Downloads are fetched by Chrome directly from the media URL the page exposes.
+- Downloads are fetched by Chrome directly from the media URL the page exposes. MediaVault does not proxy, relay, transcode, or upload media. When **Ask where to save each file** is enabled, Chrome's native folder picker controls the destination.
 - In UI-preview (demo) mode, thumbnails are local SVG data URIs, sample media uses non-resolvable `preview.mediavault.local` URLs, and no download request is made.
 - No proxy, relay, or remote code is used.
 
