@@ -1,0 +1,215 @@
+# MediaVault Architecture
+
+## 1. Scope and module status
+
+Module 1 (Extension Foundation) is complete: Manifest V3, React/TypeScript/Vite/Tailwind build, popup, options, background service worker, content-script entry point, icons/metadata, shared contracts, typed messaging, centralized error handling, local persistence, and documentation.
+
+The repository also contains later-module code from the previously approved full v1 build (platform adapters, download queue, side-panel library). That code is preserved and untouched by this foundation pass; **no new media-downloading functionality was added here**. The foundation is designed so those modules plug into it rather than bypass it.
+
+## 2. Runtime topology
+
+```
+┌────────────────────────────── Extension pages ──────────────────────────────┐
+│  Popup (React)          Options (React)          Side panel (React)          │
+│  • active tab           • settings               • local library             │
+│  • scan + select        • site access            • history actions           │
+│  • download handoff     • privacy/data                                         │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │ typed chrome.runtime messages
+                                   ▼
+┌────────────────────────── Background service worker (ESM) ──────────────────┐
+│  router.ts                                                                  │
+│   ├─ validates message shape + sender.id                                    │
+│   ├─ runRequest() error/response boundary                                   │
+│   └─ handlers: scan · sites · history · downloads                           │
+│  services/permissions.ts   dynamic content-script registration              │
+│  downloads/queue.ts        chrome.downloads orchestration (later module)    │
+│  storage/*                 chrome.storage.local + IndexedDB                 │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │ chrome.tabs.sendMessage / executeScript
+                                   ▼
+┌──────────────────────── Content script (IIFE, opt-in) ──────────────────────┐
+│  content/index.ts    injection guard + SCAN_PAGE responder                  │
+│  content/scanner.ts  adapter resolution + dedupe + limits                   │
+│  content/observer.ts SPA URL/mutation invalidation                          │
+│  adapters/*          Instagram · Facebook · TikTok DOM/public-state readers │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Trust boundaries**
+
+- Content scripts run only after the user grants optional host access and the background registers them.
+- Only extension contexts (`sender.id === chrome.runtime.id`) may call the background router.
+- UI surfaces never receive cookies, tokens, or raw credentials; adapters only read rendered DOM and public embedded page state.
+
+## 3. Folder responsibilities
+
+| Path | Responsibility |
+| --- | --- |
+| `src/background/` | Service-worker bootstrap, message router, request handlers, site registration |
+| `src/content/` | Injected scanner lifecycle, SPA invalidation, scan response |
+| `src/popup/` | Active-tab detection, permission gate, scan results, selection, download handoff |
+| `src/options/` | Settings sections and local data controls |
+| `src/sidepanel/` | Local download library |
+| `src/components/` | UI primitives, media/history/settings components, providers |
+| `src/hooks/` | Reusable state and chrome-API orchestration for UI |
+| `src/services/` | Messaging, permissions, tabs, scan orchestration, centralized error boundary |
+| `src/adapters/` | Platform URL matching/extraction + shared DOM helpers |
+| `src/downloads/` | Filename safety, Chrome Downloads client, concurrency queue (later module) |
+| `src/storage/` | Settings/sites in `chrome.storage.local`, history in IndexedDB |
+| `src/types/` | Strict contracts and typed message unions |
+| `src/utils/` | URL, filename, format, ID, debounce, errors, logging |
+| `public/` | Manifest and PNG icons copied verbatim into `dist/` |
+| `scripts/` | Icon generation and built-package verification |
+| `tests/` | Vitest unit/component tests, Chrome mock, DOM fixtures |
+
+## 4. Shared contracts
+
+| Type file | Contents |
+| --- | --- |
+| `types/platform.ts` | `PlatformId`, `PlatformMeta`, `SiteStatus` |
+| `types/media.ts` | `MediaItem`, `MediaKind`, `ScanResult`, `ScanLimitation` |
+| `types/download.ts` | `DownloadJobSummary`, `EnqueueResult` |
+| `types/settings.ts` | `Settings`, `ThemePreference` |
+| `types/history.ts` | `HistoryEntry`, `DownloadStatus`, `HistoryQuery`, `HistoryPage` |
+| `types/messages.ts` | Request union, payload map, `ApiResponse<T>`, push events |
+
+`ApiResponse<T>` is the only cross-context result shape:
+
+```ts
+type ApiResponse<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: { code: string; message: string } };
+```
+
+## 5. Message passing
+
+**UI → background** — `services/messaging.ts`
+
+- `sendToBackground(request)` is generic over `BackgroundRequest`; its return type is derived from the request's `type` via `BackgroundResponseMap`.
+- Wraps `chrome.runtime.sendMessage` callbacks, rejects on `chrome.runtime.lastError`, and enforces `MESSAGE_TIMEOUT_MS`.
+- Errors are surfaced as `AppError` with a stable code.
+
+**Background → content** — `sendToTab(tabId, request)`
+
+- Uses `chrome.tabs.sendMessage`, rejects when the receiver is absent, and enforces `SCAN_TIMEOUT_MS`.
+- The scan handler injects `content.js` before messaging, so a cold tab succeeds without a manual reload.
+
+**Background → UI pushes**
+
+- `broadcastEvent({ type: 'DOWNLOADS_UPDATED', entries })` updates open popup/side panel views.
+- `isDownloadsUpdatedEvent` validates the shape at the receiver.
+
+**Router** — `background/router.ts`
+
+1. Reject anything that is not a known request type.
+2. Reject senders whose `sender.id` is not this extension.
+3. Execute the handler inside `runRequest(...)`.
+4. Call `sendResponse` once; return `true` to keep the channel open for async work.
+
+To add a request: extend `BackgroundRequest`, add its payload to `BackgroundPayloadMap`, add a handler, add the type to `REQUEST_TYPES`, and add the switch case. TypeScript then forces the response type at every UI call site.
+
+## 6. Centralized error handling
+
+- `utils/errors.ts` defines `AppError` with a narrow `ErrorCode` union and the serialization helpers `toErrorPayload`, `fromErrorPayload`, and `getErrorMessage`.
+- `services/error-handler.ts` (`runRequest`) is the single service-worker boundary: handlers throw, the boundary converts to `ApiResponse` and logs only the request type and error code (never URLs or page data).
+- `services/messaging.ts` converts transport failures into the same `AppError` shape.
+- UI hooks call `getErrorMessage` for display; raw exceptions never cross the messaging boundary.
+
+Error codes: `PERMISSION_DENIED`, `NOT_SUPPORTED`, `TAB_UNAVAILABLE`, `CONTENT_SCRIPT_FAILED`, `SCAN_FAILED`, `DOWNLOAD_FAILED`, `INVALID_INPUT`, `STORAGE_FAILED`, `MESSAGE_FAILED`, `TIMEOUT`, `UNKNOWN`.
+
+## 7. Local storage
+
+| Store | Key / database | Shape |
+| --- | --- | --- |
+| `chrome.storage.local` | `mediavault:settings:v1` | `{ version: 1, data: Settings }` |
+| `chrome.storage.local` | `mediavault:sites:v1` | `{ version: 1, platforms: PlatformId[] }` |
+| IndexedDB | `mediavault` v1 → `history` | `HistoryEntry`, keyed by `id`, indexes on `createdAt`, `platform`, `status` |
+
+- Settings are validated and clamped on every read/write; malformed or legacy values fall back to defaults.
+- The options page and service worker both subscribe to `chrome.storage.onChanged`, so a settings change invalidates the worker's cache immediately.
+- History writes are skipped when `historyEnabled` is false. Pruning respects `maxHistoryEntries`.
+- All storage is local to the browser profile.
+
+## 8. Permissions and least privilege
+
+| Permission | Module | Rationale |
+| --- | --- | --- |
+| `storage` | Foundation | Local settings and enabled-site list |
+| `scripting` | Foundation | Register/inject the scanner only after opt-in |
+| `activeTab` | Foundation | Identify the tab when the user opens the popup |
+| `sidePanel` | Foundation UI | Library surface (Chrome 116+) |
+| `downloads` | Later module | Save media and track progress (already implemented in this repo) |
+| `optional_host_permissions` | Foundation | Per-platform consent, requested at runtime |
+
+Design rules enforced by the manifest and build verifier:
+
+- No static `content_scripts`.
+- No install-time host permissions.
+- No `cookies`, `webRequest`, `tabs`, `history`, or management permissions.
+- No HTML inline scripts; the default MV3 CSP applies.
+
+## 9. Build pipeline
+
+Two plain Vite builds produce one loadable folder:
+
+1. **Page build** (`vite.config.ts`) — `popup.html`, `options.html`, `sidepanel.html`, and `src/background/index.ts` as an ESM service worker with a fixed `background.js` name. HTML/asset chunks are hashed under `assets/`.
+2. **Content build** (`vite.content.config.ts`) — `src/content/index.ts` bundled to a single IIFE at the fixed path `content.js`. A fixed path is required for `chrome.scripting.registerContentScripts`; this is why a generic extension plugin is not used.
+
+`public/manifest.json`, `public/icons/*`, and the three HTML files are copied through the normal Vite pipeline.
+
+**Scripts**
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Watch both builds into `dist/` (reload the unpacked extension manually) |
+| `npm run build` | Typecheck → page build → content build → verify package |
+| `npm run verify:dist` | Validate manifest fields, permissions, HTML references, and chunk imports |
+| `npm run check` | Lint → tests → build |
+| `npm run icons` | Rasterize the SVG mark into 16/32/48/128 PNGs |
+| `npm run typecheck` / `lint` / `test:run` | Individual quality gates |
+
+## 10. Extension points
+
+**Add a platform adapter**
+
+1. Add the platform to `PlatformId` and `PLATFORM_META`.
+2. Implement `PlatformAdapter` (`matches`, `extract`) under `src/adapters/<platform>/`.
+3. Register it in `adapters/registry.ts`.
+4. Add fixtures and an adapter test.
+5. The popup, permissions, and site list pick it up automatically.
+
+**Add a new UI surface**
+
+Add an HTML entry to `vite.config.ts`, a `src/<surface>/main.tsx` that composes the providers (`Settings → Theme → Toast`), and a manifest reference if Chrome should discover it.
+
+**Add persisted data**
+
+Use a versioned envelope in `chrome.storage.local`, or add an IndexedDB object store with an explicit schema version in `storage/db.ts`.
+
+## 11. Local development
+
+See [README.md](../README.md#install-and-build). Short version:
+
+```bash
+npm install --include=dev
+npm run build
+# chrome://extensions → Developer mode → Load unpacked → dist/
+```
+
+## 12. Verification
+
+- Strict TypeScript across `src/` and build configs.
+- ESLint 9 with React hooks rules.
+- Vitest: adapters, storage, queue, messaging, permissions, popup rendering, background router.
+- `verify-dist.mjs` checks the built package as Chrome would consume it.
+
+Live Chrome E2E against real social pages has **not** been run in this environment. The manual QA matrix is in the README.
+
+## 13. Privacy boundaries
+
+- No backend, analytics, telemetry, remote fonts, or remote code.
+- No cookies, credentials, private messages, or auth tokens.
+- Media URLs are read from the page; signed URLs are never modified or forged.
+- Platform thumbnails load directly from the platform CDN with `referrerPolicy="no-referrer"`; nothing is proxied.
+- Private/restricted content is reported as a limitation, never bypassed.

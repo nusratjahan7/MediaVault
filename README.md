@@ -4,6 +4,18 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-5B5BD6) ![React](https://img.shields.io/badge/React-19-5B5BD6) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-5B5BD6) ![Vite](https://img.shields.io/badge/Vite-6-5B5BD6)
 
+## Documentation
+
+- [Architecture](./docs/ARCHITECTURE.md) — module boundaries, messaging, errors, storage, permissions, build pipeline
+- [Privacy policy](./PRIVACY.md)
+- [Module status](#module-status)
+
+## Module status
+
+**Module 1 — Extension Foundation is complete.** The MV3 skeleton, popup, options page, service worker, content-script entry, shared types, typed messaging, centralized error boundary, build pipeline, and package verifier are all in place.
+
+This repository also contains adapters, the download queue, and the side-panel library from the previously approved full v1 build. They are preserved so working behavior is not lost; the foundation pass did not add new download functionality.
+
 ## What it does
 
 - Scans the **current page** for media that is already visible and downloadable.
@@ -55,7 +67,9 @@ This watches both Vite builds into `dist/`. Reload the extension from `chrome://
 | Script | Description |
 | --- | --- |
 | `npm run dev` | Watch the page bundle and content script |
-| `npm run build` | Typecheck, build UI/background, then the IIFE content script |
+| `npm run build` | Typecheck, build UI/background, build content script, verify package |
+| `npm run verify:dist` | Validate manifest fields, permissions, HTML references, and chunk imports |
+| `npm run check` | Lint, test, and build in one command |
 | `npm run typecheck` | Strict TypeScript checks for app and build config |
 | `npm run lint` | ESLint 9 flat config |
 | `npm run test` | Vitest in watch mode |
@@ -142,11 +156,11 @@ Verified in this repository:
 ```bash
 npm run typecheck   # strict TypeScript, app + configs
 npm run lint        # ESLint, zero warnings/errors
-npm run test:run    # 73 tests passing
-npm run build       # loadable dist/
+npm run test:run    # 79 tests passing
+npm run build       # loadable dist/ + manifest/package verification
 ```
 
-Coverage includes filename safety, URL normalization, all three adapters (including blob and private-content cases), settings/history/sites storage, the download queue (start, completion, failure, cancellation, history-off), typed messaging, site permissions, and popup state rendering.
+Coverage includes filename safety, URL normalization, all three adapters (including blob and private-content cases), settings/history/sites storage, the download queue (start, completion, failure, cancellation, history-off), typed messaging, site permissions, background router dispatch/error boundaries, and popup state rendering.
 
 **Not yet verified here:** live end-to-end downloads against Instagram, Facebook, and TikTok. That requires loading `dist/` in Chrome and testing with real pages you are authorized to access. The manual QA checklist:
 

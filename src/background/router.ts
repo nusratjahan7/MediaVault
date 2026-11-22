@@ -1,5 +1,6 @@
+import { runRequest } from '@/services/error-handler';
 import type { ApiResponse, BackgroundRequest } from '@/types/messages';
-import { toErrorPayload } from '@/utils/errors';
+import { AppError } from '@/utils/errors';
 import { handleCancelDownload, handleDownloadItems } from './handlers/downloads';
 import {
   handleHistoryClear,
@@ -31,35 +32,30 @@ function isBackgroundRequest(value: unknown): value is BackgroundRequest {
 }
 
 async function dispatch(request: BackgroundRequest): Promise<ApiResponse<unknown>> {
-  try {
+  return runRequest(request, async () => {
     switch (request.type) {
       case 'SCAN_TAB':
-        return { ok: true, data: await handleScanTab(request) };
+        return handleScanTab(request);
       case 'DOWNLOAD_ITEMS':
-        return { ok: true, data: await handleDownloadItems(request) };
+        return handleDownloadItems(request);
       case 'CANCEL_DOWNLOAD':
-        return { ok: true, data: await handleCancelDownload(request) };
+        return handleCancelDownload(request);
       case 'HISTORY_QUERY':
-        return { ok: true, data: await handleHistoryQuery(request) };
+        return handleHistoryQuery(request);
       case 'HISTORY_DELETE':
-        return { ok: true, data: await handleHistoryDelete(request) };
+        return handleHistoryDelete(request);
       case 'HISTORY_CLEAR':
-        return { ok: true, data: await handleHistoryClear(request) };
+        return handleHistoryClear(request);
       case 'SITES_STATUS':
-        return { ok: true, data: await getSitesStatus() };
+        return getSitesStatus();
       case 'SITES_REGISTER':
-        return { ok: true, data: await registerSite(request.platform, request.tabId) };
+        return registerSite(request.platform, request.tabId);
       case 'SITES_UNREGISTER':
-        return { ok: true, data: await unregisterSite(request.platform) };
+        return unregisterSite(request.platform);
       default:
-        return {
-          ok: false,
-          error: { code: 'INVALID_INPUT', message: 'Unknown MediaVault request.' },
-        };
+        throw new AppError('INVALID_INPUT', 'Unknown MediaVault request.');
     }
-  } catch (error) {
-    return { ok: false, error: toErrorPayload(error) };
-  }
+  });
 }
 
 export function registerBackgroundRouter(): void {
