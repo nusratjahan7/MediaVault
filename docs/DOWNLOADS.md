@@ -36,6 +36,14 @@ Pause is represented by `paused: true` on a `downloading` record rather than a s
 - Live progress is capped at 99% until Chrome confirms completion. If Chrome reports no total size, the UI shows an indeterminate bar rather than a fabricated percentage.
 - Final byte counts are written from Chrome's `DownloadItem` when completion/interruption arrives.
 
+## Concurrency
+
+Settings → Downloads → Parallel downloads accepts 1–3 (default 2). `DownloadService.setConcurrency` clamps the value and starts pending jobs only as active slots free. The background updates the service when settings change. There is no unbounded concurrency path.
+
+## Bulk queue
+
+Bulk selection enqueues multiple jobs through the same service. Queue UI exposes per-item status, Chrome byte progress, pause/resume (when supported), cancel, and retry. Failure count badges and per-item errors provide an error summary. Each item still generates its own path under `MediaVault/<platform>/`, preserving the original platform category.
+
 ## Cancellation
 
 - Pending jobs are cancelled immediately (nothing was sent to Chrome).

@@ -1,4 +1,8 @@
-import { DOWNLOAD_CONCURRENCY } from '@/constants';
+import {
+  DEFAULT_DOWNLOAD_CONCURRENCY,
+  MAX_DOWNLOAD_CONCURRENCY,
+  MIN_DOWNLOAD_CONCURRENCY,
+} from '@/constants';
 import { broadcastEvent } from '@/services/messaging';
 import {
   addHistoryEntry,
@@ -219,6 +223,7 @@ export class DownloadService {
   private cancelRequested = new Set<string>();
   private waiters = new Map<string, () => void>();
   private activeCount = 0;
+  private concurrency = DEFAULT_DOWNLOAD_CONCURRENCY;
   private listenerAttached = false;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private polling = false;
@@ -240,6 +245,7 @@ export class DownloadService {
     this.ensureListener();
 
     const settings = await getSettings();
+    this.setConcurrency(settings.downloadConcurrency);
 
     if (settings.skipDownloaded) {
       const alreadyDownloaded = await hasCompletedMedia(source.id, source.url);
@@ -306,6 +312,19 @@ export class DownloadService {
     }
 
     this.pump();
+  }
+
+  setConcurrency(value: number): void {
+    const next = Number.isFinite(value) ? Math.round(value) : DEFAULT_DOWNLOAD_CONCURRENCY;
+    this.concurrency = Math.min(
+      MAX_DOWNLOAD_CONCURRENCY,
+      Math.max(MIN_DOWNLOAD_CONCURRENCY, next),
+    );
+    this.pump();
+  }
+
+  getConcurrency(): number {
+    return this.concurrency;
   }
 
   async pause(id: string): Promise<boolean> {
@@ -540,6 +559,7 @@ export class DownloadService {
     this.cancelRequested.clear();
     this.waiters.clear();
     this.activeCount = 0;
+    this.concurrency = DEFAULT_DOWNLOAD_CONCURRENCY;
     this.listenerAttached = false;
     this.polling = false;
     this.initPromise = null;
@@ -554,7 +574,7 @@ export class DownloadService {
   }
 
   private pump(): void {
-    while (this.activeCount < DOWNLOAD_CONCURRENCY) {
+    while (this.activeCount < this.concurrency) {
       const job = this.pending.shift();
       if (!job) {
         return;

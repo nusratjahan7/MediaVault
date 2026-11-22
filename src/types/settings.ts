@@ -10,4 +10,5 @@ export interface Settings {
   demoMode: boolean;
   askWhereToSave: boolean;
   skipDownloaded: boolean;
+  downloadConcurrency: number;
 }

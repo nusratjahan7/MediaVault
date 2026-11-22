@@ -4,6 +4,8 @@ import type { EnqueueResult } from '@/types/download';
 import type {
   CancelDownloadRequest,
   DownloadItemsRequest,
+  PauseDownloadRequest,
+  ResumeDownloadRequest,
   RetryDownloadRequest,
 } from '@/types/messages';
 import { AppError } from '@/utils/errors';
@@ -36,4 +38,24 @@ export async function handleRetryDownload({
   }
 
   return { retried: await downloadService.retry(historyId) };
+}
+
+export async function handlePauseDownload({
+  historyId,
+}: PauseDownloadRequest): Promise<{ paused: boolean }> {
+  if (!historyId) {
+    throw new AppError('INVALID_INPUT', 'A download id is required.');
+  }
+
+  return { paused: await downloadService.pause(historyId) };
+}
+
+export async function handleResumeDownload({
+  historyId,
+}: ResumeDownloadRequest): Promise<{ resumed: boolean }> {
+  if (!historyId) {
+    throw new AppError('INVALID_INPUT', 'A download id is required.');
+  }
+
+  return { resumed: await downloadService.resume(historyId) };
 }

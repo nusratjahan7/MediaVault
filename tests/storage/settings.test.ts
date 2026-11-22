@@ -93,4 +93,11 @@ describe('settings storage', () => {
     expect((await saveSettings({ skipDownloaded: true })).skipDownloaded).toBe(true);
     expect((await getSettings(true)).skipDownloaded).toBe(true);
   });
+
+  it('clamps download concurrency to the supported range', async () => {
+    expect((await getSettings()).downloadConcurrency).toBe(2);
+    expect((await saveSettings({ downloadConcurrency: 9 })).downloadConcurrency).toBe(3);
+    expect((await saveSettings({ downloadConcurrency: 0 })).downloadConcurrency).toBe(1);
+    expect((await saveSettings({ downloadConcurrency: 2 })).downloadConcurrency).toBe(2);
+  });
 });

@@ -1,10 +1,11 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SettingsProvider } from '@/components/providers/SettingsProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import { App } from '@/popup/App';
+import { getTabSelection } from '@/storage/selection';
 import { saveSettings } from '@/storage/settings';
 import type { ApiResponse, BackgroundRequest } from '@/types/messages';
 import { chromeMock, setActiveTabUrl } from '../mocks/chrome';
@@ -189,6 +190,116 @@ describe('popup', () => {
     expect(
       screen.getByRole('button', { name: 'Copy caption & source URL' }),
     ).toBeTruthy();
+  });
+
+  it('supports bulk selection of accessible TikTok videos', async () => {
+    setActiveTabUrl('https://www.tiktok.com/@creator/video/730');
+    const user = userEvent.setup();
+
+    respondToBackground((request) => {
+      switch (request.type) {
+        case 'SITES_STATUS':
+          return {
+            ok: true,
+            data: [
+              {
+                platform: 'tiktok',
+                label: 'TikTok',
+                enabled: true,
+                permissionGranted: true,
+              },
+            ],
+          };
+        case 'HISTORY_QUERY':
+          return { ok: true, data: { entries: [], total: 0, hasMore: false } };
+        case 'SCAN_TAB':
+          return {
+            ok: true,
+            data: {
+              platform: 'tiktok',
+              pageUrl: 'https://www.tiktok.com/@creator/video/730',
+              scannedAt: 1,
+              pageType: 'video',
+              account: {
+                platform: 'tiktok',
+                username: 'creator',
+                displayName: 'Creator',
+              },
+              items: [
+                {
+                  id: 'tiktok_one',
+                  platform: 'tiktok',
+                  kind: 'video',
+                  url: 'https://v16.tiktokcdn.com/one.mp4',
+                  thumbnailUrl: 'https://p16.tiktokcdn.com/one.jpg',
+                  author: 'creator',
+                  caption: 'First video',
+                  downloadable: true,
+                },
+                {
+                  id: 'tiktok_two',
+                  platform: 'tiktok',
+                  kind: 'video',
+                  url: 'https://v16.tiktokcdn.com/two.mp4',
+                  thumbnailUrl: 'https://p16.tiktokcdn.com/two.jpg',
+                  author: 'creator',
+                  caption: 'Second video',
+                  downloadable: true,
+                },
+              ],
+              limitations: [],
+            },
+          };
+        case 'DOWNLOAD_ITEMS':
+          return {
+            ok: true,
+            data: {
+              accepted: request.items.map((item, index) => ({
+                id: `job-${index}`,
+                itemId: item.id,
+                filename: `tiktok-${index}.mp4`,
+                status: 'queued',
+              })),
+              skipped: 0,
+              alreadyDownloaded: 0,
+            },
+          };
+        default:
+          return undefined;
+      }
+    });
+
+    renderPopup();
+
+    expect(await screen.findByText('2 items found')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Copy caption & source URL' }),
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Start select' }));
+    await user.click(screen.getByRole('button', { name: 'Select all 2' }));
+
+    await vi.waitFor(async () => {
+      expect(await getTabSelection(1)).toHaveLength(2);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Download 2' }));
+
+    await vi.waitFor(() => {
+      expect(
+        chromeMock.runtime.sendMessage.mock.calls.some(
+          ([message]) =>
+            (message as { type?: string }).type === 'DOWNLOAD_ITEMS',
+        ),
+      ).toBe(true);
+    });
+
+    const downloadCall = chromeMock.runtime.sendMessage.mock.calls.find(
+      ([message]) => (message as { type?: string }).type === 'DOWNLOAD_ITEMS',
+    );
+    const request = downloadCall?.[0] as { items: unknown[] };
+    expect(request.items).toHaveLength(2);
+    expect(await screen.findByText('2 downloads queued')).toBeTruthy();
   });
 
   it('shows a clear unsupported-page state', async () => {

@@ -1,4 +1,5 @@
 import { initDownloadQueue } from '@/downloads/queue';
+import { downloadService } from '@/downloads/service';
 import { subscribeToSettings } from '@/storage/settings';
 import { logger } from '@/utils/logger';
 import { reconcileSiteRegistrations } from './handlers/sites';
@@ -6,8 +7,10 @@ import { registerBackgroundRouter } from './router';
 
 registerBackgroundRouter();
 
-// Keep the service worker's settings cache in sync with the options page.
-subscribeToSettings(() => undefined);
+// Keep the service worker's settings cache and queue concurrency current.
+subscribeToSettings((settings) => {
+  downloadService.setConcurrency(settings.downloadConcurrency);
+});
 
 let bootstrapPromise: Promise<void> | null = null;
 

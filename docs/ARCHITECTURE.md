@@ -14,6 +14,10 @@ Module 5 (Instagram Media Downloader) is complete: profile pictures, grid media 
 
 Module 6 (Facebook Media Downloader) is complete: photos, direct videos, rendered album items with per-photo ids, reels, visible profile/page media, Facebook URL/page-type detection, `data-utime` dates, embedded HD/SD sources, caption export, and a direct-video guard that rejects page-only or adaptive streams.
 
+Module 7 (TikTok Media Downloader) is complete: current videos, thumbnail assets, slideshows, multi-item public profile discovery, profile-card link handling, playback/download formats, caption export, and bulk selection through the shared engine.
+
+Module 8 (Bulk Download & Start Select) is complete: per-tab session-persisted selection, checkbox selection mode, select-all/clear/remove, configurable 1–3 concurrency, per-item queue pause/resume/cancel/retry, failure summaries, and per-platform folder preservation.
+
 ## 2. Runtime topology
 
 ```
@@ -136,6 +140,14 @@ Normalized metadata never assumes parity across platforms. Missing usernames, da
 - Page-only or adaptive video links are never treated as direct files; blocked/private/login states produce blocking limitations.
 - Profile/page discovery is limited to visible rendered media. See [FACEBOOK.md](./FACEBOOK.md).
 
+### TikTok-specific layer
+
+- `parse-embedded-state.ts` collects primary and multi-item public embedded data (`__UNIVERSAL_DATA_FOR_REHYDRATION__`, legacy `SIGI_STATE`) without signed internal APIs.
+- `extract.ts` normalizes videos, slideshow images, and downloadable cover thumbnails; profile cards without direct sources become clearly unavailable video links with downloadable posters.
+- Formats prefer playback MP4, with a separate download-copy MP4 when exposed.
+- Private/login/blob-only/exhausted states produce explicit limitations; signed URLs are never rewritten.
+- Multiple accessible items feed the existing bulk selection UI and shared DownloadService. See [TIKTOK.md](./TIKTOK.md).
+
 ## 5. Message passing
 
 **UI → background** — `services/messaging.ts`
@@ -179,6 +191,7 @@ Error codes: `PERMISSION_DENIED`, `NOT_SUPPORTED`, `TAB_UNAVAILABLE`, `CONTENT_S
 | `chrome.storage.local` | `mediavault:settings:v1` | `{ version: 1, data: Settings }` (includes `demoMode`, `askWhereToSave`, `skipDownloaded`) |
 | `chrome.storage.local` | `mediavault:sites:v1` | `{ version: 1, platforms: PlatformId[] }` |
 | `chrome.storage.local` | `mediavault:preview:accounts:v1` | Mock-only selected preview account per platform |
+| `chrome.storage.session` | `mediavault:selection:v1:<tabId>` | Per-tab bulk selection (up to 200 media items), cleared with the browser session |
 | IndexedDB | `mediavault` v1 → `history` | `HistoryEntry`, keyed by `id`, indexes on `createdAt`, `platform`, `status` |
 
 - Settings are validated and clamped on every read/write; malformed or legacy values fall back to defaults.
@@ -248,7 +261,11 @@ getHistory(limit?)              // session + persisted history merged
 
 **Skip Downloaded:** when enabled, `enqueue` checks local history for a completed item with the same media id or URL and throws `ALREADY_DOWNLOADED`. The queue facade reports the count so popup and in-page surfaces can show a distinct message.
 
-**Destination and duplicates:** `saveAs` is driven by Settings → Downloads → Ask where to save each file; otherwise Chrome uses the default download folder plus the configured subfolder. Filenames are sanitized and `conflictAction: 'uniquify'` prevents overwrites.
+**Destination and duplicates:** `saveAs` is driven by Settings → Downloads → Ask where to save each file; otherwise Chrome uses the default download folder plus the configured subfolder. Filenames are sanitized and `conflictAction: 'uniquify'` prevents overwrites. Each path retains `MediaVault/<platform>/…` even for mixed-platform bulk selections.
+
+**Concurrency:** the service accepts a clamped 1–3 parallel limit from settings (default 2). The background updates it on settings changes; pending jobs start as slots free. No unbounded fan-out is possible.
+
+**Queue controls:** pause/resume/cancel/retry are exposed through typed messages and the queue preview. Failed items keep per-item errors and can be retried; the queue header summarizes failures.
 
 **Reconciliation:** on startup, active history rows are searched in Chrome. In-progress downloads are reattached to polling, completed rows are finalized with byte counts, and missing/interrupted rows become failed with a clear message.
 
@@ -303,7 +320,7 @@ npm run build
 
 - Strict TypeScript across `src/` and build configs.
 - ESLint 9 with React hooks rules.
-- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, Instagram profile pictures/grid/story discovery, Facebook albums/reels/embedded video/direct-video guards, in-page action placement and click handling, caption export, Skip Downloaded, download service states/progress/pause/cancel/retry/Save As/duplicates, queue integration, storage, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
+- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, Instagram profile pictures/grid/story discovery, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile-card links and bulk selection, per-tab selection persistence and concurrency limits, in-page action placement and click handling, caption export, Skip Downloaded, download service states/progress/pause/cancel/retry/Save As/duplicates, queue controls and failure summary, storage, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
 - `verify-dist.mjs` checks the built package as Chrome would consume it, including all five HTML surfaces.
 
 Live Chrome E2E against real social pages has **not** been run in this environment. The manual QA matrix is in the README.
@@ -317,5 +334,7 @@ Live Chrome E2E against real social pages has **not** been run in this environme
 - Platform thumbnails load directly from the platform CDN with `referrerPolicy="no-referrer"`; nothing is proxied.
 - In-page buttons read only media already visible on the authorized page; login/private pages receive no buttons.
 - Caption export copies text locally to the clipboard; nothing is uploaded.
+- Bulk selections live in `chrome.storage.session` per tab, are never synced, and clear when the browser session ends.
+- TikTok discovery uses public embedded page data only; no signed internal API or anti-bot token is used.
 - Demo thumbnails are local SVG data URIs and demo actions never call Chrome Downloads.
 - Private/restricted content is reported as a limitation, never bypassed.

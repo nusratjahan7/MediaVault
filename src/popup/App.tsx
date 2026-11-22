@@ -12,11 +12,12 @@ import { PLATFORM_IDS, PLATFORM_META } from '@/constants';
 import { useActiveTab } from '@/hooks/useActiveTab';
 import { useDownloads } from '@/hooks/useDownloads';
 import { usePreviewAccount } from '@/hooks/usePreviewAccount';
+import { useQueueActions } from '@/hooks/useQueueActions';
 import { useQueuePreview } from '@/hooks/useQueuePreview';
 import { useScan, type ScanController } from '@/hooks/useScan';
-import { useSelection } from '@/hooks/useSelection';
 import { useSettings } from '@/hooks/useSettings';
 import { useSiteAccess } from '@/hooks/useSiteAccess';
+import { useTabSelection } from '@/hooks/useTabSelection';
 import { useToast } from '@/hooks/useToast';
 import { getMockPageContext } from '@/mocks/pages';
 import { getMockScanResult } from '@/mocks/media';
@@ -70,9 +71,14 @@ export function App() {
 
   const scan = demo ? mockScan : liveScan;
   const items = useMemo(() => scan.result?.items ?? [], [scan.result]);
-  const selection = useSelection(items);
+  const selection = useTabSelection(
+    items,
+    tab?.id ?? null,
+    demo ? demoPlatform : livePlatform,
+  );
   const downloads = useDownloads();
   const queue = useQueuePreview(demo);
+  const queueActions = useQueueActions();
 
   const livePageContext = useMemo<PageContext | null>(() => {
     if (demo || !livePlatform || !url || !liveScan.result) {
@@ -109,7 +115,6 @@ export function App() {
 
   useEffect(() => {
     setFilter('all');
-    setSelectionMode(false);
   }, [scan.result?.pageUrl, demoPlatform, demo]);
 
   const openSettings = useCallback(() => {
@@ -401,7 +406,8 @@ export function App() {
               compact
             />
             {(pageContext.platform === 'instagram' ||
-              pageContext.platform === 'facebook') && (
+              pageContext.platform === 'facebook' ||
+              pageContext.platform === 'tiktok') && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -423,6 +429,34 @@ export function App() {
               controller={queue}
               limit={2}
               onViewAll={openHistory}
+              onPause={
+                demo
+                  ? undefined
+                  : (item) => {
+                      void queueActions.pause(item.id);
+                    }
+              }
+              onResume={
+                demo
+                  ? undefined
+                  : (item) => {
+                      void queueActions.resume(item.id);
+                    }
+              }
+              onCancel={
+                demo
+                  ? undefined
+                  : (item) => {
+                      void queueActions.cancel(item.id);
+                    }
+              }
+              onRetry={
+                demo
+                  ? undefined
+                  : (item) => {
+                      void queueActions.retry(item.id);
+                    }
+              }
             />
           </div>
         )}

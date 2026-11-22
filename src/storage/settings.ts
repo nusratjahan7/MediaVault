@@ -1,6 +1,9 @@
 import {
-  MIN_HISTORY_ENTRIES,
+  DEFAULT_DOWNLOAD_CONCURRENCY,
+  MAX_DOWNLOAD_CONCURRENCY,
   MAX_HISTORY_ENTRIES,
+  MIN_DOWNLOAD_CONCURRENCY,
+  MIN_HISTORY_ENTRIES,
   SETTINGS_SCHEMA_VERSION,
   SETTINGS_STORAGE_KEY,
 } from '@/constants';
@@ -17,6 +20,7 @@ export const DEFAULT_SETTINGS: Settings = {
   demoMode: false,
   askWhereToSave: false,
   skipDownloaded: false,
+  downloadConcurrency: DEFAULT_DOWNLOAD_CONCURRENCY,
 };
 
 interface SettingsEnvelope {
@@ -55,6 +59,17 @@ function coerceHistoryLimit(value: unknown): number {
   return Math.min(MAX_HISTORY_ENTRIES, Math.max(MIN_HISTORY_ENTRIES, Math.round(value)));
 }
 
+function coerceConcurrency(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_SETTINGS.downloadConcurrency;
+  }
+
+  return Math.min(
+    MAX_DOWNLOAD_CONCURRENCY,
+    Math.max(MIN_DOWNLOAD_CONCURRENCY, Math.round(value)),
+  );
+}
+
 export function coerceSettings(value: unknown): Settings {
   if (!isRecord(value)) {
     return { ...DEFAULT_SETTINGS };
@@ -84,6 +99,7 @@ export function coerceSettings(value: unknown): Settings {
       value.skipDownloaded,
       DEFAULT_SETTINGS.skipDownloaded,
     ),
+    downloadConcurrency: coerceConcurrency(value.downloadConcurrency),
   };
 }
 

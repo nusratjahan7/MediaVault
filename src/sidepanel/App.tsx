@@ -5,6 +5,7 @@ import { QueuePreview } from '@/components/queue/QueuePreview';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { useDemoHistory } from '@/hooks/useDemoHistory';
 import { useHistory } from '@/hooks/useHistory';
+import { useQueueActions } from '@/hooks/useQueueActions';
 import { useQueuePreview } from '@/hooks/useQueuePreview';
 import { useSettings } from '@/hooks/useSettings';
 import { openExtensionPage } from '@/services/navigation';
@@ -21,6 +22,7 @@ export function App() {
   const demoHistory = useDemoHistory();
   const history = demo ? demoHistory : liveHistory;
   const queue = useQueuePreview(demo);
+  const queueActions = useQueueActions();
   const [tab, setTab] = useState<SidepanelTab>('library');
 
   const activeQueueCount = useMemo(
@@ -81,7 +83,39 @@ export function App() {
           />
         ) : (
           <div className="space-y-3 p-3">
-            <QueuePreview controller={queue} limit={8} onViewAll={openHistory} />
+            <QueuePreview
+              controller={queue}
+              limit={8}
+              onViewAll={openHistory}
+              onPause={
+                demo
+                  ? undefined
+                  : (item) => {
+                      void queueActions.pause(item.id);
+                    }
+              }
+              onResume={
+                demo
+                  ? undefined
+                  : (item) => {
+                      void queueActions.resume(item.id);
+                    }
+              }
+              onCancel={
+                demo
+                  ? undefined
+                  : (item) => {
+                      void queueActions.cancel(item.id);
+                    }
+              }
+              onRetry={
+                demo
+                  ? undefined
+                  : (item) => {
+                      void queueActions.retry(item.id);
+                    }
+              }
+            />
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"

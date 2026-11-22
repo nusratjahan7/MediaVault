@@ -38,6 +38,7 @@ export const permissionsOnRemoved = new EventMock();
 export const runtimeOnMessage = new EventMock();
 
 const storageData = new Map<string, unknown>();
+const sessionStorageData = new Map<string, unknown>();
 const grantedOrigins = new Set<string>();
 const downloadItems = new Map<number, chrome.downloads.DownloadItem>();
 const downloadOptions = new Map<number, chrome.downloads.DownloadOptions>();
@@ -138,6 +139,45 @@ export const chromeMock = {
       clear: vi.fn(async () => {
         storageData.clear();
         storageOnChanged.emit({}, 'local');
+      }),
+    },
+    session: {
+      get: vi.fn(async (keys?: string | string[] | Record<string, unknown> | null) => {
+        if (keys === undefined || keys === null) {
+          return Object.fromEntries(sessionStorageData);
+        }
+
+        if (typeof keys === 'string') {
+          return { [keys]: clone(sessionStorageData.get(keys)) };
+        }
+
+        if (Array.isArray(keys)) {
+          return Object.fromEntries(
+            keys.map((key) => [key, clone(sessionStorageData.get(key))]),
+          );
+        }
+
+        return Object.fromEntries(
+          Object.keys(keys).map((key) => [
+            key,
+            sessionStorageData.has(key)
+              ? clone(sessionStorageData.get(key))
+              : keys[key],
+          ]),
+        );
+      }),
+      set: vi.fn(async (items: Record<string, unknown>) => {
+        for (const [key, value] of Object.entries(items)) {
+          sessionStorageData.set(key, clone(value));
+        }
+      }),
+      remove: vi.fn(async (keys: string | string[]) => {
+        for (const key of Array.isArray(keys) ? keys : [keys]) {
+          sessionStorageData.delete(key);
+        }
+      }),
+      clear: vi.fn(async () => {
+        sessionStorageData.clear();
       }),
     },
     onChanged: storageOnChanged,
@@ -306,6 +346,7 @@ export function installChromeMock(): void {
 
 export function resetChromeMock(): void {
   storageData.clear();
+  sessionStorageData.clear();
   grantedOrigins.clear();
   downloadItems.clear();
   downloadOptions.clear();

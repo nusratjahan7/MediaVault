@@ -83,7 +83,22 @@ Rules enforced by design:
 - Grid buttons save the rendered grid image and show a toast telling the user to open the post for original media.
 - Feedback is shown in a shadow-DOM toast stack; no page CSS leaks into the controls.
 
-The popup also offers **Copy caption & source URL** for Instagram and Facebook, and distinguishes “already downloaded” from unavailable media when Skip Downloaded is on. Facebook page types include albums and reels alongside photos, videos, profiles, and feeds.
+The popup also offers **Copy caption & source URL** for Instagram, Facebook, and TikTok, and distinguishes “already downloaded” from unavailable media when Skip Downloaded is on. Facebook page types include albums and reels alongside photos, videos, profiles, and feeds. TikTok surfaces videos, separate downloadable thumbnails, slideshows, and profile-card links; embedded profile lists can be bulk-selected.
+
+## Bulk selection
+
+- **Start select** turns on checkbox overlays; toggling cards adds/removes individual items.
+- **Select all** adds every currently discovered downloadable item; **Clear selection** empties it.
+- The sticky toolbar shows the selected count and **Download N**.
+- Selection persists per browser tab in `chrome.storage.session`, survives filter changes and popup reopen, and can include items from multiple platforms. Each download keeps its platform folder.
+- Restored selections show the toolbar even before re-entering select mode.
+
+## Queue controls
+
+- Configurable parallel downloads (1–3, default 2) are capped by the engine.
+- Active queue rows expose Pause/Resume when Chrome supports it and Cancel.
+- Failed/cancelled rows expose Retry.
+- A failure count badge and per-item error text summarize problems; the download bar shows overall saved/failed/total progress.
 
 ## Live download feedback
 

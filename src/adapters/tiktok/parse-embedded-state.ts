@@ -124,16 +124,88 @@ function extractItem(itemStruct: JsonRecord | undefined): TikTokEmbeddedItem | n
   return item.author || item.videoUrl || item.downloadUrl || imageUrls.length > 0 ? item : null;
 }
 
-export function parseTikTokEmbeddedState(document: Document): TikTokEmbeddedItem | null {
+function itemKey(item: TikTokEmbeddedItem): string | undefined {
+  return item.id ?? item.videoUrl ?? item.downloadUrl ?? item.imageUrls[0];
+}
+
+function addItem(
+  items: TikTokEmbeddedItem[],
+  seen: Set<string>,
+  item: TikTokEmbeddedItem | null,
+): void {
+  if (!item || items.length >= 50) {
+    return;
+  }
+
+  const key = itemKey(item);
+  if (key && seen.has(key)) {
+    return;
+  }
+
+  if (key) {
+    seen.add(key);
+  }
+
+  items.push(item);
+}
+
+function collectItemArrays(
+  record: JsonRecord,
+  items: TikTokEmbeddedItem[],
+  seen: Set<string>,
+  depth = 0,
+): void {
+  if (depth > 4 || items.length >= 50) {
+    return;
+  }
+
+  for (const [key, value] of Object.entries(record)) {
+    if (Array.isArray(value) && /item/i.test(key)) {
+      for (const entry of value) {
+        const entryRecord = asRecord(entry);
+        const itemStruct = asRecord(entryRecord?.itemStruct) ?? entryRecord;
+        addItem(items, seen, extractItem(itemStruct));
+      }
+      continue;
+    }
+
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      /(detail|scope|user|challenge|list|item)/i.test(key)
+    ) {
+      const child = asRecord(value);
+      if (child) {
+        collectItemArrays(child, items, seen, depth + 1);
+      }
+    }
+  }
+}
+
+/**
+ * Collects every public item embedded on the current page. Video pages usually
+ * contain one item; profile/tag/feed pages may embed an item list. Only page
+ * data is used — no signed internal APIs or anti-bot bypasses.
+ */
+export function parseTikTokEmbeddedItems(document: Document): TikTokEmbeddedItem[] {
+  const items: TikTokEmbeddedItem[] = [];
+  const seen = new Set<string>();
+
   const universal = readJsonScript(document, 'script#__UNIVERSAL_DATA_FOR_REHYDRATION__');
   if (universal) {
     const scope = asRecord(universal['__DEFAULT_SCOPE__']);
-    const detail = asRecord(scope?.['webapp.video-detail']);
-    const itemInfo = asRecord(detail?.itemInfo);
-    const itemStruct = asRecord(itemInfo?.itemStruct);
-    const item = extractItem(itemStruct);
-    if (item) {
-      return item;
+
+    if (scope) {
+      const detail = asRecord(scope['webapp.video-detail']);
+      const itemInfo = asRecord(detail?.itemInfo);
+      addItem(items, seen, extractItem(asRecord(itemInfo?.itemStruct)));
+
+      const userDetail = asRecord(scope['webapp.user-detail']);
+      if (userDetail) {
+        collectItemArrays(userDetail, items, seen);
+      }
+
+      collectItemArrays(scope, items, seen);
     }
   }
 
@@ -142,13 +214,14 @@ export function parseTikTokEmbeddedState(document: Document): TikTokEmbeddedItem
     const itemModule = asRecord(sigi.ItemModule);
     if (itemModule) {
       for (const value of Object.values(itemModule)) {
-        const item = extractItem(asRecord(value));
-        if (item) {
-          return item;
-        }
+        addItem(items, seen, extractItem(asRecord(value)));
       }
     }
   }
 
-  return null;
+  return items;
+}
+
+export function parseTikTokEmbeddedState(document: Document): TikTokEmbeddedItem | null {
+  return parseTikTokEmbeddedItems(document)[0] ?? null;
 }

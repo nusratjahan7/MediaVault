@@ -4,6 +4,7 @@ import { Section } from '@/components/layout/Section';
 import { FilenameTemplateField } from '@/components/settings/FilenameTemplateField';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { Toggle } from '@/components/ui/Toggle';
 import { useSettings } from '@/hooks/useSettings';
 import { useToast } from '@/hooks/useToast';
@@ -139,6 +140,28 @@ export function DownloadSection() {
             }}
             label="Skip already downloaded media"
           />
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-medium text-fg">Parallel downloads</p>
+            <p className="mt-0.5 max-w-[60ch] text-[11px] leading-relaxed text-muted">
+              Maximum downloads started at once. MediaVault caps this at three to respect
+              Chrome and platform resource limits.
+            </p>
+          </div>
+          <Select
+            value={String(settings.downloadConcurrency)}
+            onChange={(event) => {
+              void updateSettings({ downloadConcurrency: Number(event.target.value) });
+            }}
+            aria-label="Maximum parallel downloads"
+            wrapperClassName="w-full sm:w-32"
+          >
+            <option value="1">1 at a time</option>
+            <option value="2">2 at a time</option>
+            <option value="3">3 at a time</option>
+          </Select>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

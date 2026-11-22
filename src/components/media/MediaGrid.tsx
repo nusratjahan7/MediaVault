@@ -23,7 +23,7 @@ export function MediaGrid({
           key={item.id}
           item={item}
           selected={selection.isSelected(item.id)}
-          onToggle={() => selection.toggle(item.id)}
+          onToggle={() => selection.toggle(item)}
           selectionMode={selectionMode}
         />
       ))}

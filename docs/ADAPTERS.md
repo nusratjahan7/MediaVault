@@ -94,6 +94,14 @@ Missing values stay `undefined`; no placeholder account, date, or media URL is f
 - Blob/MSE playback is unsupported; no stream reconstruction is attempted.
 - Profile/page media is limited to what is visible; login/private states are blocking limitations.
 
+### TikTok specifics
+
+- Public embedded data can yield the primary video plus multiple profile/feed items; only page data is read, never signed internal APIs or anti-bot endpoints.
+- Each video gets playback MP4 first and a download-copy MP4 alternate when exposed.
+- Cover images become separate downloadable thumbnail items when no slideshow images exist.
+- Profile cards are parsed from visible anchors/posters: direct videos when embedded, otherwise link-only entries with a clear reason plus downloadable thumbnails.
+- Private/login states and blob-only playback produce blocking/unsupported limitations; signed URLs are never rewritten.
+
 ## Download options
 
 `getDownloadOptions(item)` returns only formats with a direct, permitted `http(s)` URL.

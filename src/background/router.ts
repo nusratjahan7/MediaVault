@@ -4,6 +4,8 @@ import { AppError } from '@/utils/errors';
 import {
   handleCancelDownload,
   handleDownloadItems,
+  handlePauseDownload,
+  handleResumeDownload,
   handleRetryDownload,
 } from './handlers/downloads';
 import {
@@ -19,6 +21,8 @@ const REQUEST_TYPES = new Set<string>([
   'DOWNLOAD_ITEMS',
   'CANCEL_DOWNLOAD',
   'RETRY_DOWNLOAD',
+  'PAUSE_DOWNLOAD',
+  'RESUME_DOWNLOAD',
   'HISTORY_QUERY',
   'HISTORY_DELETE',
   'HISTORY_CLEAR',
@@ -47,6 +51,10 @@ async function dispatch(request: BackgroundRequest): Promise<ApiResponse<unknown
         return handleCancelDownload(request);
       case 'RETRY_DOWNLOAD':
         return handleRetryDownload(request);
+      case 'PAUSE_DOWNLOAD':
+        return handlePauseDownload(request);
+      case 'RESUME_DOWNLOAD':
+        return handleResumeDownload(request);
       case 'HISTORY_QUERY':
         return handleHistoryQuery(request);
       case 'HISTORY_DELETE':

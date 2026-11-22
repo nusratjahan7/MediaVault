@@ -64,4 +64,48 @@ describe('QueuePreview', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(refresh).toHaveBeenCalledTimes(1);
   });
+
+  it('exposes pause and cancel actions for active downloads', async () => {
+    const onPause = vi.fn();
+    const onCancel = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <QueuePreview
+        controller={controller({ mode: 'live' })}
+        limit={1}
+        onPause={onPause}
+        onCancel={onCancel}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Pause download' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel download' }));
+
+    expect(onPause).toHaveBeenCalledTimes(1);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('summarizes failures in the queue header', () => {
+    render(
+      <QueuePreview
+        controller={controller({
+          mode: 'live',
+          items: [
+            {
+              id: 'failed-one',
+              platform: 'instagram',
+              kind: 'image',
+              filename: 'failed.jpg',
+              status: 'failed',
+              error: 'Expired link',
+              createdAt: 1,
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByText('1 failure')).toBeTruthy();
+  });
 });

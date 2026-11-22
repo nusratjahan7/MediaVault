@@ -95,6 +95,15 @@ describe('background message router', () => {
     expect(response).toEqual({ ok: true, data: { retried: false } });
   });
 
+  it('routes pause and resume requests through the download service', async () => {
+    await expect(
+      dispatch({ type: 'PAUSE_DOWNLOAD', historyId: 'missing-download' }),
+    ).resolves.toEqual({ ok: true, data: { paused: false } });
+    await expect(
+      dispatch({ type: 'RESUME_DOWNLOAD', historyId: 'missing-download' }),
+    ).resolves.toEqual({ ok: true, data: { resumed: false } });
+  });
+
   it('reports every platform as disabled before access is granted', async () => {
     const response = await dispatch({ type: 'SITES_STATUS' });
 

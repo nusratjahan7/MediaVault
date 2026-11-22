@@ -217,6 +217,35 @@ describe('DownloadService', () => {
     await waitForState(record.id, 'completed');
   });
 
+  it('respects the configured concurrency limit', async () => {
+    await saveSettings({ downloadConcurrency: 1 });
+
+    const first = await service.enqueue(SOURCE);
+    const second = await service.enqueue({
+      ...SOURCE,
+      id: 'instagram_second',
+      url: 'https://scontent.cdninstagram.com/v/second.mp4',
+    });
+
+    service.start();
+
+    const firstDownloadId = await waitFor(() => getLastDownloadId());
+    await waitForAttachedDownload(first.id, firstDownloadId);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(chromeMock.downloads.download).toHaveBeenCalledTimes(1);
+
+    completeDownload(firstDownloadId);
+    await waitForState(first.id, 'completed');
+
+    const secondDownloadId = await waitFor(() => {
+      const id = getLastDownloadId();
+      return id !== undefined && id !== firstDownloadId ? id : undefined;
+    });
+    await waitForAttachedDownload(second.id, secondDownloadId);
+    completeDownload(secondDownloadId);
+    await waitForState(second.id, 'completed');
+  });
+
   it('keeps duplicate filenames safe with Chrome uniquify behavior', async () => {
     await service.enqueue(SOURCE);
     await service.enqueue(SOURCE);

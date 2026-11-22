@@ -213,7 +213,7 @@ export function ScanView({
         onDismiss={downloads.reset}
       />
 
-      {selectionMode && (
+      {(selectionMode || selection.selectedCount > 0) && (
         <SelectionBar
           selectedCount={selection.selectedItems.length}
           selectableCount={selection.selectableCount}
