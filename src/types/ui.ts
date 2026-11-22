@@ -1,17 +1,11 @@
 import type { DownloadStatus } from './history';
 import type { MediaItem, MediaKind } from './media';
+import type { PageType } from './page';
 import type { PlatformId } from './platform';
 
 export type UiDataMode = 'live' | 'demo';
 
-export type PageKind =
-  | 'post'
-  | 'reel'
-  | 'video'
-  | 'photo'
-  | 'profile'
-  | 'feed'
-  | 'unknown';
+export type PageKind = PageType | 'photo';
 
 export interface PageContext {
   platform: PlatformId;

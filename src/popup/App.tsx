@@ -80,15 +80,16 @@ export function App() {
 
     const first =
       liveScan.result.items.find((item) => item.author) ?? liveScan.result.items[0];
+    const account = liveScan.result.account ?? undefined;
 
     return {
       platform: livePlatform,
-      author: first?.author,
-      accountName: first?.author,
-      handle: first?.author,
+      author: account?.username ?? first?.author,
+      accountName: account?.displayName ?? account?.username ?? first?.author,
+      handle: account?.username ?? first?.author,
       pageTitle: first?.caption ?? url.pathname,
       pageUrl: liveScan.result.pageUrl,
-      pageKind: inferPageKind(url),
+      pageKind: liveScan.result.pageType ?? inferPageKind(url),
       mediaCount: liveScan.result.items.length,
       capturedAt: liveScan.result.scannedAt,
       mode: 'live',

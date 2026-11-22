@@ -2,6 +2,7 @@ import { MIN_IMAGE_SIZE } from '@/constants';
 import type { MediaItem, ScanLimitation } from '@/types/media';
 import { normalizeHttpUrl } from '@/utils/url';
 import type { ExtractContext, ExtractResult } from '../types';
+import { identifyInstagramAccount } from './account';
 import {
   addLimitation,
   collectImages,
@@ -16,41 +17,12 @@ import {
 
 const POST_PATH = /^\/(p|reel|reels|tv)\//;
 
-function extractAuthor(document: Document): string | undefined {
-  const ogTitle = ogContent(document, 'og:title');
-  const titleMatch = ogTitle?.match(/\(@([A-Za-z0-9._]+)\)/);
-  if (titleMatch?.[1]) {
-    return titleMatch[1];
-  }
-
-  const twitterCreator = document
-    .querySelector<HTMLMetaElement>('meta[name="twitter:creator"]')
-    ?.content?.trim();
-  if (twitterCreator) {
-    return twitterCreator.replace(/^@/, '');
-  }
-
-  const href = document
-    .querySelector<HTMLAnchorElement>('article header a[href^="/"], main header a[href^="/"]')
-    ?.getAttribute('href');
-  const username = href?.split('/').filter(Boolean)[0];
-
-  if (
-    username &&
-    !['explore', 'reels', 'stories', 'accounts', 'direct', 'p', 'reel'].includes(username)
-  ) {
-    return username;
-  }
-
-  return undefined;
-}
-
 export function extractInstagram({ document, url }: ExtractContext): ExtractResult {
   const items: MediaItem[] = [];
   const limitations: ScanLimitation[] = [];
   const postUrl = url.toString();
   const isPostPage = POST_PATH.test(url.pathname);
-  const author = extractAuthor(document);
+  const author = identifyInstagramAccount(document)?.username;
   const caption = trimCaption(
     ogContent(document, 'og:description') ?? ogContent(document, 'description'),
   );

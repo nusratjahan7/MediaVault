@@ -5,6 +5,7 @@ type JsonRecord = Record<string, unknown>;
 export interface TikTokEmbeddedItem {
   id?: string;
   author?: string;
+  authorName?: string;
   caption?: string;
   videoUrl?: string;
   downloadUrl?: string;
@@ -12,6 +13,7 @@ export interface TikTokEmbeddedItem {
   width?: number;
   height?: number;
   durationSeconds?: number;
+  publishedAt?: number;
   imageUrls: string[];
 }
 
@@ -94,11 +96,19 @@ function extractItem(itemStruct: JsonRecord | undefined): TikTokEmbeddedItem | n
   const video = asRecord(itemStruct.video);
   const author = asRecord(itemStruct.author);
   const imageUrls = readImageUrls(itemStruct);
+  const createTime = readNumber(itemStruct, 'createTime');
 
   const item: TikTokEmbeddedItem = {
     id: readString(itemStruct, 'id'),
     author: readString(author, 'uniqueId'),
+    authorName: readString(author, 'nickname'),
     caption: readString(itemStruct, 'desc'),
+    publishedAt:
+      createTime !== undefined
+        ? createTime < 1_000_000_000_000
+          ? createTime * 1000
+          : createTime
+        : undefined,
     videoUrl: readString(video, 'playAddr'),
     downloadUrl: readString(video, 'downloadAddr'),
     coverUrl:

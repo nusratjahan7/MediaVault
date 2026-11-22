@@ -1,9 +1,11 @@
 import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SettingsProvider } from '@/components/providers/SettingsProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import { App } from '@/popup/App';
+import { saveSettings } from '@/storage/settings';
 import type { ApiResponse, BackgroundRequest } from '@/types/messages';
 import { chromeMock, setActiveTabUrl } from '../mocks/chrome';
 
@@ -100,9 +102,36 @@ describe('popup', () => {
 
     expect(await screen.findByText('1 item found')).toBeTruthy();
     expect(screen.getByText('@studio')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Download' })).toBeTruthy();
-    expect(screen.getByText('0 items selected')).toBeTruthy();
+    expect(screen.getByText('Live page')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Download current' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Bulk download' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Start select' })).toBeTruthy();
     expect(screen.getByText(/Local only/)).toBeTruthy();
+  });
+
+  it('runs the complete UI preview from mock data without downloading', async () => {
+    await saveSettings({ demoMode: true });
+    const user = userEvent.setup();
+
+    renderPopup();
+
+    expect(
+      await screen.findByRole('radiogroup', { name: 'Preview platform' }),
+    ).toBeTruthy();
+    expect(screen.getByText('UI preview.')).toBeTruthy();
+    expect(screen.getByText('North Studio')).toBeTruthy();
+    expect(await screen.findByText('Download queue')).toBeTruthy();
+    expect(await screen.findByText('4 items found')).toBeTruthy();
+    expect(screen.getByText(/Demo data · nothing is downloaded/)).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Download current' }));
+
+    expect(await screen.findByText('Preview: 1 item queued')).toBeTruthy();
+    expect(chromeMock.downloads.download).not.toHaveBeenCalled();
+    expect(chromeMock.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'DOWNLOAD_ITEMS' }),
+      expect.any(Function),
+    );
   });
 
   it('shows a clear unsupported-page state', async () => {

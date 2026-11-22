@@ -12,7 +12,11 @@ import { PLATFORM_IDS, PLATFORM_META } from '@/constants';
 import { useSettings } from '@/hooks/useSettings';
 import { useTheme } from '@/hooks/useTheme';
 import { useToast } from '@/hooks/useToast';
-import { getMockAccounts, MOCK_ACCOUNTS } from '@/mocks/accounts';
+import {
+  DEFAULT_PREVIEW_ACCOUNT_IDS,
+  getMockAccounts,
+  MOCK_ACCOUNTS,
+} from '@/mocks/accounts';
 import {
   getSelectedPreviewAccounts,
   selectPreviewAccount,
@@ -52,9 +56,15 @@ export function App() {
   }, []);
 
   const selectedCount = useMemo(
-    () => PLATFORM_IDS.filter((platform) => selected[platform]).length,
+    () =>
+      PLATFORM_IDS.filter(
+        (platform) => (selected[platform] ?? DEFAULT_PREVIEW_ACCOUNT_IDS[platform]).length > 0,
+      ).length,
     [selected],
   );
+
+  const isSelected = (account: PreviewAccount): boolean =>
+    (selected[account.platform] ?? DEFAULT_PREVIEW_ACCOUNT_IDS[account.platform]) === account.id;
 
   const accounts = filter === 'all' ? MOCK_ACCOUNTS : getMockAccounts(filter);
 
@@ -167,7 +177,7 @@ export function App() {
           <AccountCard
             key={account.id}
             account={account}
-            selected={selected[account.platform] === account.id}
+            selected={isSelected(account)}
             onSelect={(next) => {
               void handleSelect(next);
             }}

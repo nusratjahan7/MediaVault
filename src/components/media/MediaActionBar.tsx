@@ -38,9 +38,10 @@ export function MediaActionBar({
           size="sm"
           onClick={onBulkDownload}
           disabled={downloadDisabled}
+          title={itemCount > 0 ? `Queue all ${itemCount} downloadable items` : 'No media found'}
           icon={<DownloadCloud className="size-3.5" aria-hidden="true" />}
         >
-          Bulk {itemCount > 0 ? `(${itemCount})` : ''}
+          Bulk download
         </Button>
         <Button
           variant="secondary"

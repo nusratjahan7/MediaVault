@@ -7,21 +7,29 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 ## Documentation
 
 - [Architecture](./docs/ARCHITECTURE.md) — module boundaries, messaging, errors, storage, permissions, build pipeline
+- [Platform adapters](./docs/ADAPTERS.md) — detection, account identity, metadata, formats, resilience
+- [UI guide](./docs/UI.md) — design system, surfaces, components, demo mode and the mock boundary
 - [Privacy policy](./PRIVACY.md)
 - [Module status](#module-status)
 
 ## Module status
 
-**Module 1 — Extension Foundation is complete.** The MV3 skeleton, popup, options page, service worker, content-script entry, shared types, typed messaging, centralized error boundary, build pipeline, and package verifier are all in place.
+- **Module 1 — Extension Foundation:** complete. MV3 skeleton, build pipeline, shared types, typed messaging, centralized error boundary, and package verifier.
+- **Module 2 — Premium MediaVault UI:** complete. Popup, side panel, settings, full history page, account selection page, bulk selection toolbar, queue/progress interface, empty/error states, and toasts. A clearly isolated demo-data mode makes every surface reviewable without touching real downloads.
+- **Module 3 — Platform Detection & Media Discovery:** complete. A shared `PlatformAdapter` contract, per-platform page type/account detection, normalized metadata (post id/date/source/formats/status), download options, graceful failure handling, and dedicated detection/metadata tests.
 
-This repository also contains adapters, the download queue, and the side-panel library from the previously approved full v1 build. They are preserved so working behavior is not lost; the foundation pass did not add new download functionality.
+The repository also contains the download queue from the previously approved full v1 build. It is preserved so working behavior is not lost. No new download engine was added; in demo mode every download action is simulated by `src/mocks/`.
 
 ## What it does
 
 - Scans the **current page** for media that is already visible and downloadable.
-- Extracts direct media URLs from rendered DOM and public embedded page data.
+- Detects the platform, page type, and visible account for Instagram, Facebook, and TikTok.
+- Extracts direct media URLs and permitted metadata from rendered DOM and public embedded page data.
+- Reports supported formats and availability without assuming every platform exposes the same fields.
 - Queues downloads through Chrome's Downloads API with safe filenames and platform subfolders.
-- Tracks local download history in IndexedDB and shows it in a side panel library.
+- Tracks local download history in IndexedDB with a side-panel library and a full history page.
+- Shows page/account context, current/bulk download actions, a select mode, and a live queue preview.
+- Offers a per-platform account-selection preview and a fully mock-driven interface preview.
 - Gives you one-click per-site access, revocable at any time.
 
 ## What it deliberately does not do
@@ -82,10 +90,21 @@ This watches both Vite builds into `dist/`. Reload the extension from `chrome://
 1. Open a post, photo, reel, or video on a supported site.
 2. Click the MediaVault toolbar icon.
 3. Click **Enable on this site** once. Chrome asks you to confirm site access.
-4. Scan runs automatically. Select media and click **Download N**.
-5. Open **Library** in the side panel to review, retry, reveal, or remove entries.
+4. Scan runs automatically. Use **Download current**, **Bulk download**, or **Start select** for granular selection.
+5. Open **Library** in the side panel to review, retry, reveal, or remove entries; open the full **History** and **Accounts** pages from the header or footer.
 
 Site access is stored per platform. Revoke it in Settings → Site access.
+
+### Interface preview (mock data)
+
+Open **Settings → Interface preview** and enable **Demo data mode**, or click **Preview the interface** on an unsupported/disabled page. Every screen then uses sample Instagram, Facebook, and TikTok data:
+
+- downloads are simulated and never call Chrome Downloads;
+- account selection is mock-only and never touches a session;
+- thumbnails are local SVG data URIs, so the preview makes no network requests;
+- turning demo mode off restores live scanning, history, and queue behavior.
+
+Mock content lives exclusively in [`src/mocks/`](./src/mocks) and is documented in [docs/UI.md](./docs/UI.md).
 
 ## Architecture
 
@@ -93,21 +112,42 @@ Site access is stored per platform. Revoke it in Settings → Site access.
 src/
   background/        MV3 service worker: message router, scan and site handlers
   content/           Silent SPA-aware scanner (IIFE, injected only after approval)
-  popup/             Media detection, selection, download flow
-  options/           Appearance, downloads, site access, privacy/data
-  sidepanel/         Local download library
-  components/        UI primitives, media, history, settings, providers
-  hooks/             Settings, theme, tab, site access, scan, selection, downloads, history
-  services/          Typed messaging, permissions, tabs, scan orchestration
-  adapters/          Platform adapters + shared DOM extraction helpers
-    instagram/ facebook/ tiktok/
+  popup/             Platform/page context, actions, selection, queue preview
+  options/           Appearance, downloads, site access, UI preview, privacy/data
+  sidepanel/         Library and Queue tabs
+  history/           Full download history page
+  accounts/          Account selection preview page
+  components/        UI primitives, layout, media, queue, accounts, history, providers
+  hooks/             Settings, theme, tab, access, scan, selection, downloads, history, queue
+  services/          Typed messaging, permissions, tabs, scan orchestration, errors, navigation
+  mocks/             UI-only sample accounts/media/queue/history/preview preferences
+  adapters/          PlatformAdapter contract, base pipeline, metadata normalization
+    instagram/ facebook/ tiktok/   adapter + page-type + account + extraction
   downloads/         Filename builder, Chrome Downloads client, concurrency queue
   storage/           chrome.storage settings/sites + IndexedDB history
-  types/             Strict shared contracts and message unions
-  utils/             URL, filename, formatting, errors, logging, hashing
+  types/             Strict shared contracts, message unions, UI contracts
+  utils/             URL, filename, page context, status, formatting, errors, logging
 ```
 
 **Flow:** popup → typed message → service worker → on-demand content-script injection → adapter scan → `ScanResult` → selection → download queue → `chrome.downloads` → IndexedDB history → side panel.
+
+### Platform detection and discovery
+
+Each adapter implements `PlatformAdapter`:
+
+```ts
+matches(url)
+detectPlatform(url)
+detectPageType({ document, url })
+identifyAccount({ document, url })
+discoverMedia({ document, url })
+extractMetadata({ document, url })
+getDownloadOptions(item)
+```
+
+Detected page types: profile, feed, single post, video/reel, story, highlight, tagged posts, and saved collections where the platform exposes them. Each `MediaItem` carries platform, account username/identity, media type, direct URL, thumbnail, caption, post date, post id, source page URL, formats, and download status.
+
+Platforms expose different fields; missing values stay undefined rather than being invented. Selectors use layered fallbacks, and extraction failures return a warning instead of throwing. Login walls, private content, and adaptive streams are reported as restrictions — never bypassed. See [docs/ADAPTERS.md](./docs/ADAPTERS.md).
 
 ### Build design
 
@@ -145,9 +185,11 @@ Known limits (also shown in-product):
 4. Signed CDN URLs expire — download while the page is open.
 5. Carousels/slideshows include only rendered slides.
 6. Profile/feed crawling is intentionally absent.
-7. Chrome 116+ desktop only.
-8. Platform DOM changes can break extraction until adapters are updated.
-9. Chrome Web Store review may scrutinize social downloader extensions; use is limited to content you are authorized to save.
+7. Page type/account/date detection depends on what the platform exposes; unavailable fields remain empty.
+8. Stories, highlights, tagged posts, and saved collections are scanned only when the content is already visible/accessible.
+9. Chrome 116+ desktop only.
+10. Platform DOM changes can break extraction until adapters are updated.
+11. Chrome Web Store review may scrutinize social downloader extensions; use is limited to content you are authorized to save.
 
 ## Testing and verification
 
@@ -156,22 +198,26 @@ Verified in this repository:
 ```bash
 npm run typecheck   # strict TypeScript, app + configs
 npm run lint        # ESLint, zero warnings/errors
-npm run test:run    # 79 tests passing
+npm run test:run    # 114 tests passing
 npm run build       # loadable dist/ + manifest/package verification
 ```
 
-Coverage includes filename safety, URL normalization, all three adapters (including blob and private-content cases), settings/history/sites storage, the download queue (start, completion, failure, cancellation, history-off), typed messaging, site permissions, background router dispatch/error boundaries, and popup state rendering.
+Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, filename safety, URL normalization, settings/history/sites storage, the download queue (start, completion, failure, cancellation, history-off), typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
 
 **Not yet verified here:** live end-to-end downloads against Instagram, Facebook, and TikTok. That requires loading `dist/` in Chrome and testing with real pages you are authorized to access. The manual QA checklist:
 
 - Popup renders in light, dark, and system themes.
 - Unsupported page shows the limitation; supported-but-disabled page shows the permission gate.
 - Enabling a site allows scanning without a reload.
-- Public Instagram post/reel, Facebook photo, TikTok video/slideshow scan and download.
+- Demo mode shows the platform switcher, page/account card, queue preview, and simulated current/bulk/select actions without calling Chrome Downloads.
+- On a live post/reel/story/highlight/tagged/saved page, the context card reflects the adapter-detected page type and visible account.
+- Account selection persists and the popup page-context card reflects the chosen mock account.
+- Full history page shows stats, filters, empty state, and clear confirmation.
+- Side panel switches between Library and Queue; footer links open history/accounts/settings.
 - Blob-only video shows a limitation and no unsafe attempt.
 - Cancel/retry/failure flows update the library.
 - Revoking access removes the content script and restores the gate.
-- Keyboard-only navigation and reduced-motion behavior.
+- Keyboard-only navigation, 320px side panel, and reduced-motion behavior.
 
 ## Privacy and compliance
 

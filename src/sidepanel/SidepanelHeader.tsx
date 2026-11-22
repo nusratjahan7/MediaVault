@@ -22,7 +22,7 @@ export function SidepanelHeader({
       <div className="flex min-w-0 items-center gap-2">
         <BrandMark className="size-7" />
         <div className="min-w-0">
-          <p className="text-sm leading-tight font-semibold tracking-tight text-fg">Library</p>
+          <p className="text-sm leading-tight font-semibold tracking-tight text-fg">MediaVault</p>
           <p className="truncate text-[10px] leading-tight text-muted">
             {total} {pluralize(total, 'local entry', 'local entries')}
           </p>

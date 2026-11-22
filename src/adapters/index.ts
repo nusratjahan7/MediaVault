@@ -1,5 +1,5 @@
 export * from './registry';
 export * from './types';
-export { instagramAdapter } from './instagram';
-export { facebookAdapter } from './facebook';
-export { tiktokAdapter } from './tiktok';
+export { InstagramAdapter, instagramAdapter } from './instagram';
+export { FacebookAdapter, facebookAdapter } from './facebook';
+export { TikTokAdapter, tiktokAdapter } from './tiktok';

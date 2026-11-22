@@ -11,6 +11,18 @@ const PROFILE = /^\/(@[^/]+|[A-Za-z0-9._]+)\/?$/;
 export function inferPageKind(url: URL): PageKind {
   switch (url.hostname.replace(/^www\./, '')) {
     case 'instagram.com':
+      if (/^\/stories\/highlights\//.test(url.pathname)) {
+        return 'highlight';
+      }
+      if (/^\/stories\//.test(url.pathname)) {
+        return 'story';
+      }
+      if (/^\/(saved|collections)\//.test(url.pathname) || /\/saved\/?$/.test(url.pathname)) {
+        return 'saved';
+      }
+      if (/\/tagged\/?$/.test(url.pathname)) {
+        return 'tagged';
+      }
       if (INSTAGRAM_REEL.test(url.pathname)) {
         return 'reel';
       }
@@ -22,6 +34,18 @@ export function inferPageKind(url: URL): PageKind {
       }
       return 'feed';
     case 'facebook.com':
+      if (/^\/stories\//.test(url.pathname)) {
+        return 'story';
+      }
+      if (/^\/highlights?\//.test(url.pathname)) {
+        return 'highlight';
+      }
+      if (url.searchParams.get('sk')?.toLowerCase() === 'saved') {
+        return 'saved';
+      }
+      if (/tagged/i.test(url.pathname)) {
+        return 'tagged';
+      }
       if (FACEBOOK_VIDEO.test(url.pathname)) {
         return 'video';
       }
@@ -33,6 +57,12 @@ export function inferPageKind(url: URL): PageKind {
       }
       return 'post';
     case 'tiktok.com':
+      if (/\/@[^/]+\/favorites\/?$/.test(url.pathname)) {
+        return 'saved';
+      }
+      if (/^\/tag\//.test(url.pathname)) {
+        return 'tagged';
+      }
       if (TIKTOK_VIDEO.test(url.pathname)) {
         return 'video';
       }
@@ -62,6 +92,14 @@ export function pageKindLabel(kind: PageKind): string {
       return 'Profile';
     case 'feed':
       return 'Feed';
+    case 'story':
+      return 'Story';
+    case 'highlight':
+      return 'Highlight';
+    case 'tagged':
+      return 'Tagged posts';
+    case 'saved':
+      return 'Saved collection';
     default:
       return 'Page';
   }

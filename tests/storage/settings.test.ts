@@ -68,10 +68,17 @@ describe('settings storage', () => {
   });
 
   it('resets to defaults', async () => {
-    await saveSettings({ theme: 'dark', maxHistoryEntries: 100 });
+    await saveSettings({ theme: 'dark', maxHistoryEntries: 100, demoMode: true });
     const settings = await resetSettings();
 
     expect(settings).toEqual(DEFAULT_SETTINGS);
+    expect(settings.demoMode).toBe(false);
     expect(await getSettings(true)).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('persists the demo-mode flag', async () => {
+    expect((await getSettings()).demoMode).toBe(false);
+    expect((await saveSettings({ demoMode: true })).demoMode).toBe(true);
+    expect((await getSettings(true)).demoMode).toBe(true);
   });
 });

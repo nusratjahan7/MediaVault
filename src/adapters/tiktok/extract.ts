@@ -1,6 +1,7 @@
-import type { MediaItem, ScanLimitation } from '@/types/media';
+import type { MediaFormat, MediaItem, ScanLimitation } from '@/types/media';
 import { normalizeHttpUrl } from '@/utils/url';
 import type { ExtractContext, ExtractResult } from '../types';
+import { identifyTikTokAccount } from './account';
 import {
   addLimitation,
   collectVideos,
@@ -20,12 +21,39 @@ export function extractTikTok({ document, url }: ExtractContext): ExtractResult 
   const limitations: ScanLimitation[] = [];
   const postUrl = url.toString();
   const embedded = parseTikTokEmbeddedState(document);
-  const author = embedded?.author;
+  const author = identifyTikTokAccount(document)?.username ?? embedded?.author;
   const caption = trimCaption(embedded?.caption);
 
   if (embedded) {
-    const videoUrl = normalizeHttpUrl(embedded.videoUrl ?? embedded.downloadUrl, url.href);
+    const playbackUrl = normalizeHttpUrl(embedded.videoUrl, url.href);
+    const downloadUrl = normalizeHttpUrl(embedded.downloadUrl, url.href);
+    const videoUrl = playbackUrl ?? downloadUrl;
     const coverUrl = normalizeHttpUrl(embedded.coverUrl, url.href) ?? undefined;
+    const formats: MediaFormat[] = [];
+
+    if (playbackUrl) {
+      formats.push({
+        id: 'tiktok-playback',
+        label: 'MP4 · Playback',
+        extension: 'mp4',
+        mimeType: 'video/mp4',
+        kind: 'video',
+        quality: 'source',
+        url: playbackUrl,
+      });
+    }
+
+    if (downloadUrl && downloadUrl !== playbackUrl) {
+      formats.push({
+        id: 'tiktok-download',
+        label: 'MP4 · Download copy',
+        extension: 'mp4',
+        mimeType: 'video/mp4',
+        kind: 'video',
+        quality: 'hd',
+        url: downloadUrl,
+      });
+    }
 
     if (videoUrl) {
       items.push(
@@ -38,6 +66,8 @@ export function extractTikTok({ document, url }: ExtractContext): ExtractResult 
           author,
           caption,
           filenameHint: embedded.id ? `tiktok-${embedded.id}` : 'tiktok-video',
+          publishedAt: embedded.publishedAt,
+          formats,
         }),
       );
     }
@@ -55,6 +85,7 @@ export function extractTikTok({ document, url }: ExtractContext): ExtractResult 
           author,
           caption,
           filenameHint: 'tiktok-photo',
+          publishedAt: embedded.publishedAt,
         }),
       );
     }
@@ -81,6 +112,7 @@ export function extractTikTok({ document, url }: ExtractContext): ExtractResult 
           author,
           caption,
           filenameHint: 'tiktok-video',
+          publishedAt: embedded?.publishedAt,
         }),
       );
       continue;
@@ -98,6 +130,7 @@ export function extractTikTok({ document, url }: ExtractContext): ExtractResult 
             postUrl,
             author,
             caption,
+            publishedAt: embedded?.publishedAt,
             downloadable: false,
             unsupportedReason:
               'TikTok is streaming this video without a direct file link on this page.',
@@ -131,6 +164,7 @@ export function extractTikTok({ document, url }: ExtractContext): ExtractResult 
           author,
           caption,
           filenameHint: 'tiktok-video',
+          publishedAt: embedded?.publishedAt,
         }),
       );
     }

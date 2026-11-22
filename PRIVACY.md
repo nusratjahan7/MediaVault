@@ -10,8 +10,9 @@ MediaVault is designed to work entirely on your device. There is no MediaVault s
 
 | Storage | Contents | Purpose |
 | --- | --- | --- |
-| `chrome.storage.local` (`mediavault:settings:v1`) | Theme, download folder, filename template, auto-scan, history preferences | Keep your preferences |
+| `chrome.storage.local` (`mediavault:settings:v1`) | Theme, download folder, filename template, auto-scan, history preferences, demo-mode flag | Keep your preferences |
 | `chrome.storage.local` (`mediavault:sites:v1`) | Platforms you enabled | Restore site access after a restart |
+| `chrome.storage.local` (`mediavault:preview:accounts:v1`) | Mock preview account IDs only | Remember the UI-preview account per platform |
 | IndexedDB `mediavault` → `history` | Filename, platform, status, media URL, thumbnail URL, timestamps, optional bytes/error | Local download library |
 
 Nothing in this storage is uploaded anywhere. Only extension pages and the service worker can read it.
@@ -25,19 +26,21 @@ Nothing in this storage is uploaded anywhere. Only extension pages and the servi
 - **`sidePanel`** — display the local library.
 - **Optional host access** — requested per platform when you click "Enable on this site." Only that platform's origin is granted. Revoking it unregisters the scanner.
 
-MediaVault never requests Chrome's `cookies` permission and does not read passwords, form fields, messages, authentication tokens, or account data.
+MediaVault never requests Chrome's `cookies` permission and does not read passwords, form fields, messages, authentication tokens, or account data. Page type and account identity are inferred only from content already rendered on the page you opened; no account or session API is used.
 
 ## Network activity
 
 - The extension itself makes **no network requests** to MediaVault or any analytics service.
 - Thumbnails in the popup and library load directly from the platform CDN URLs present on the page, with `referrerPolicy="no-referrer"`. This reveals your IP to the platform, as any image request would.
 - Downloads are fetched by Chrome directly from the media URL the page exposes.
+- In UI-preview (demo) mode, thumbnails are local SVG data URIs, sample media uses non-resolvable `preview.mediavault.local` URLs, and no download request is made.
 - No proxy, relay, or remote code is used.
 
 ## Retention and deletion
 
 - **Clear history** (side panel or Settings → Privacy & data) deletes IndexedDB history entries. Files already downloaded are not deleted.
-- **Reset everything** clears history and restores default settings.
+- **Reset everything** clears history, restores default settings, and removes mock preview selections.
+- Turning off **Demo data mode** leaves preview account IDs in local storage until you reset data; they contain only mock identifiers and no platform information.
 - **Uninstalling** the extension removes its local storage and IndexedDB database according to Chrome's extension data removal behavior.
 - Disabling download history prevents new entries from being written.
 

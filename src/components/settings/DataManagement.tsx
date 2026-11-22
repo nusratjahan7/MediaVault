@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Download, RotateCcw, Trash2, Upload } from 'lucide-react';
+import { PREVIEW_ACCOUNTS_STORAGE_KEY } from '@/constants';
 import { useSettings } from '@/hooks/useSettings';
 import { useToast } from '@/hooks/useToast';
 import { sendToBackground } from '@/services/messaging';
@@ -46,10 +47,11 @@ export function DataManagement() {
 
     try {
       await sendToBackground({ type: 'HISTORY_CLEAR' }).catch(() => undefined);
+      await chrome.storage.local.remove(PREVIEW_ACCOUNTS_STORAGE_KEY).catch(() => undefined);
       await resetSettings();
       toast({
         title: 'Local data cleared',
-        description: 'History and settings were reset on this device.',
+        description: 'History, settings, and preview selections were reset on this device.',
         variant: 'success',
       });
     } catch (caught) {

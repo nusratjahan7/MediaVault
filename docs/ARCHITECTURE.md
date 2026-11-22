@@ -4,16 +4,25 @@
 
 Module 1 (Extension Foundation) is complete: Manifest V3, React/TypeScript/Vite/Tailwind build, popup, options, background service worker, content-script entry point, icons/metadata, shared contracts, typed messaging, centralized error handling, local persistence, and documentation.
 
-The repository also contains later-module code from the previously approved full v1 build (platform adapters, download queue, side-panel library). That code is preserved and untouched by this foundation pass; **no new media-downloading functionality was added here**. The foundation is designed so those modules plug into it rather than bypass it.
+Module 2 (Premium UI) is complete: page/account context, current/bulk/select actions, queue preview, Library/Queue side panel, full history page, account-selection page, toast/empty/error states, and a mock-data preview mode. Mock content is isolated under `src/mocks/`; demo mode never calls `chrome.downloads`.
+
+Module 3 (Platform Detection & Media Discovery) is complete: a shared `PlatformAdapter` contract, per-platform page type and account detection, normalized metadata (post id/date/source/formats/status), supported download options, graceful failure handling, and dedicated detection/metadata tests.
+
+The download queue from the previously approved full v1 build is preserved and unchanged; **no new media-downloading engine was added**. Module 3 extended the platform adapters, and Module 2 added the UI surfaces.
 
 ## 2. Runtime topology
 
 ```
 ┌────────────────────────────── Extension pages ──────────────────────────────┐
-│  Popup (React)          Options (React)          Side panel (React)          │
-│  • active tab           • settings               • local library             │
-│  • scan + select        • site access            • history actions           │
-│  • download handoff     • privacy/data                                         │
+│  Popup                 Options              Side panel                       │
+│  • page/account ctx    • appearance         • Library                        │
+│  • scan + select       • downloads          • Queue                          │
+│  • current/bulk/select • site access        • history actions                │
+│  • queue preview       • UI preview mode                                     │
+│                                                                              │
+│  History page (React)                  Accounts page (React)                 │
+│  • stats/filters/search                • preview account selection           │
+│  • retry/reveal/delete/clear           • mock-only, no session access        │
 └──────────────────────────────────┬──────────────────────────────────────────┘
                                    │ typed chrome.runtime messages
                                    ▼
@@ -30,9 +39,10 @@ The repository also contains later-module code from the previously approved full
                                    ▼
 ┌──────────────────────── Content script (IIFE, opt-in) ──────────────────────┐
 │  content/index.ts    injection guard + SCAN_PAGE responder                  │
-│  content/scanner.ts  adapter resolution + dedupe + limits                   │
+│  content/scanner.ts  adapter resolution + discovery + dedupe + limits       │
 │  content/observer.ts SPA URL/mutation invalidation                          │
-│  adapters/*          Instagram · Facebook · TikTok DOM/public-state readers │
+│  adapters/*          PlatformAdapter: detect page/account, discover media,  │
+│                      normalize metadata/formats, fail gracefully            │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -48,12 +58,15 @@ The repository also contains later-module code from the previously approved full
 | --- | --- |
 | `src/background/` | Service-worker bootstrap, message router, request handlers, site registration |
 | `src/content/` | Injected scanner lifecycle, SPA invalidation, scan response |
-| `src/popup/` | Active-tab detection, permission gate, scan results, selection, download handoff |
-| `src/options/` | Settings sections and local data controls |
-| `src/sidepanel/` | Local download library |
-| `src/components/` | UI primitives, media/history/settings components, providers |
-| `src/hooks/` | Reusable state and chrome-API orchestration for UI |
-| `src/services/` | Messaging, permissions, tabs, scan orchestration, centralized error boundary |
+| `src/popup/` | Page/account context, permission gate, actions, selection mode, queue preview, scan results |
+| `src/options/` | Settings sections, UI preview mode, local data controls |
+| `src/sidepanel/` | Library and Queue views with history/account/settings links |
+| `src/history/` | Full history page with stats, filters, pagination, and actions |
+| `src/accounts/` | Account-selection preview page |
+| `src/components/` | UI primitives, layout shell, media/history/queue/context/account/settings components, providers |
+| `src/hooks/` | Reusable state and chrome-API orchestration, plus preview queue/account/history hooks |
+| `src/mocks/` | UI-only sample data and preview preferences; never imports download services |
+| `src/services/` | Messaging, permissions, tabs, scan orchestration, centralized error boundary, page navigation |
 | `src/adapters/` | Platform URL matching/extraction + shared DOM helpers |
 | `src/downloads/` | Filename safety, Chrome Downloads client, concurrency queue (later module) |
 | `src/storage/` | Settings/sites in `chrome.storage.local`, history in IndexedDB |
@@ -68,7 +81,8 @@ The repository also contains later-module code from the previously approved full
 | Type file | Contents |
 | --- | --- |
 | `types/platform.ts` | `PlatformId`, `PlatformMeta`, `SiteStatus` |
-| `types/media.ts` | `MediaItem`, `MediaKind`, `ScanResult`, `ScanLimitation` |
+| `types/page.ts` | `PageType`, `PlatformDetection`, `AccountIdentity` |
+| `types/media.ts` | `MediaItem`, `MediaKind`, `MediaFormat`, `DownloadOption`, `MediaDownloadStatus`, `ScanResult` |
 | `types/download.ts` | `DownloadJobSummary`, `EnqueueResult` |
 | `types/settings.ts` | `Settings`, `ThemePreference` |
 | `types/history.ts` | `HistoryEntry`, `DownloadStatus`, `HistoryQuery`, `HistoryPage` |
@@ -81,6 +95,24 @@ type ApiResponse<T> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message: string } };
 ```
+
+### Platform adapter contract
+
+Every platform implements `PlatformAdapter` (`src/adapters/types.ts`):
+
+```ts
+matches(url)                    // URL ownership
+detectPlatform(url)             // { platform, supported, url }
+detectPageType(ctx)             // profile/feed/post/reel/video/story/highlight/tagged/saved/unknown
+identifyAccount(ctx)            // visible account identity or null
+discoverMedia(ctx)              // AdapterDiscovery { platform, pageType, account, items, limitations }
+extractMetadata(ctx)            // MediaItem[]
+getDownloadOptions(item)        // DownloadOption[]
+```
+
+`BasePlatformAdapter` owns the shared resilience pipeline: safe page/account detection, extraction try/catch, per-item URL validation, dedupe, blocking-restriction handling, metadata enrichment, and format inference. Each platform supplies only `matches`, `detectPageType`, `identifyAccount`, and raw extraction.
+
+Normalized metadata never assumes parity across platforms. Missing usernames, dates, post ids, thumbnails, formats, or direct URLs remain `undefined` rather than being fabricated. Page-specific notes (blob streams, signed URL expiry, carousel limits) travel as `ScanLimitation`s. Page types and account detection are covered in [ADAPTERS.md](./ADAPTERS.md).
 
 ## 5. Message passing
 
@@ -122,8 +154,9 @@ Error codes: `PERMISSION_DENIED`, `NOT_SUPPORTED`, `TAB_UNAVAILABLE`, `CONTENT_S
 
 | Store | Key / database | Shape |
 | --- | --- | --- |
-| `chrome.storage.local` | `mediavault:settings:v1` | `{ version: 1, data: Settings }` |
+| `chrome.storage.local` | `mediavault:settings:v1` | `{ version: 1, data: Settings }` (includes `demoMode`) |
 | `chrome.storage.local` | `mediavault:sites:v1` | `{ version: 1, platforms: PlatformId[] }` |
+| `chrome.storage.local` | `mediavault:preview:accounts:v1` | Mock-only selected preview account per platform |
 | IndexedDB | `mediavault` v1 → `history` | `HistoryEntry`, keyed by `id`, indexes on `createdAt`, `platform`, `status` |
 
 - Settings are validated and clamped on every read/write; malformed or legacy values fall back to defaults.
@@ -153,10 +186,10 @@ Design rules enforced by the manifest and build verifier:
 
 Two plain Vite builds produce one loadable folder:
 
-1. **Page build** (`vite.config.ts`) — `popup.html`, `options.html`, `sidepanel.html`, and `src/background/index.ts` as an ESM service worker with a fixed `background.js` name. HTML/asset chunks are hashed under `assets/`.
+1. **Page build** (`vite.config.ts`) — `popup.html`, `options.html`, `sidepanel.html`, `history.html`, `accounts.html`, and `src/background/index.ts` as an ESM service worker with a fixed `background.js` name. HTML/asset chunks are hashed under `assets/`.
 2. **Content build** (`vite.content.config.ts`) — `src/content/index.ts` bundled to a single IIFE at the fixed path `content.js`. A fixed path is required for `chrome.scripting.registerContentScripts`; this is why a generic extension plugin is not used.
 
-`public/manifest.json`, `public/icons/*`, and the three HTML files are copied through the normal Vite pipeline.
+`public/manifest.json` and `public/icons/*` are copied verbatim; the five HTML entry pages are emitted with hashed asset references by Vite.
 
 **Scripts**
 
@@ -169,7 +202,20 @@ Two plain Vite builds produce one loadable folder:
 | `npm run icons` | Rasterize the SVG mark into 16/32/48/128 PNGs |
 | `npm run typecheck` / `lint` / `test:run` | Individual quality gates |
 
-## 10. Extension points
+## 10. UI data modes
+
+The UI reads through hooks that expose either live or demo data:
+
+- `useHistory(enabled)` — production history from IndexedDB.
+- `useDemoHistory()` — local sample history with filtering and delete/clear.
+- `useLiveQueue(enabled)` — active/recent jobs from local history, refreshed by download events.
+- `useMockQueue(enabled)` — deterministic simulated queue ticks.
+- `useQueuePreview(demoMode)` — chooses one controller and exposes `mode: 'live' | 'demo'`.
+- `usePreviewAccount(platform)` — reads mock account selection from the preview key.
+
+`Settings.demoMode` (default `false`) switches between them. Mock data and preview preferences are confined to `src/mocks/`; no production module imports a mock queue or mock downloader. Turning the mode off restores live behavior without touching stored history or settings.
+
+## 11. Extension points
 
 **Add a platform adapter**
 
@@ -187,7 +233,11 @@ Add an HTML entry to `vite.config.ts`, a `src/<surface>/main.tsx` that composes 
 
 Use a versioned envelope in `chrome.storage.local`, or add an IndexedDB object store with an explicit schema version in `storage/db.ts`.
 
-## 11. Local development
+**Add a previewable surface**
+
+Build the component with explicit props, add it to a page entry in `vite.config.ts`, then wire live and mock controllers behind a `demoMode` branch. Keep sample data in `src/mocks/` and never import download services into it.
+
+## 12. Local development
 
 See [README.md](../README.md#install-and-build). Short version:
 
@@ -197,19 +247,20 @@ npm run build
 # chrome://extensions → Developer mode → Load unpacked → dist/
 ```
 
-## 12. Verification
+## 13. Verification
 
 - Strict TypeScript across `src/` and build configs.
 - ESLint 9 with React hooks rules.
-- Vitest: adapters, storage, queue, messaging, permissions, popup rendering, background router.
-- `verify-dist.mjs` checks the built package as Chrome would consume it.
+- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, storage, queue, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
+- `verify-dist.mjs` checks the built package as Chrome would consume it, including all five HTML surfaces.
 
 Live Chrome E2E against real social pages has **not** been run in this environment. The manual QA matrix is in the README.
 
-## 13. Privacy boundaries
+## 14. Privacy boundaries
 
 - No backend, analytics, telemetry, remote fonts, or remote code.
 - No cookies, credentials, private messages, or auth tokens.
 - Media URLs are read from the page; signed URLs are never modified or forged.
 - Platform thumbnails load directly from the platform CDN with `referrerPolicy="no-referrer"`; nothing is proxied.
+- Demo thumbnails are local SVG data URIs and demo actions never call Chrome Downloads.
 - Private/restricted content is reported as a limitation, never bypassed.

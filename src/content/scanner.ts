@@ -13,14 +13,16 @@ export function scanPage(document: Document, url: URL): ScanResult {
     );
   }
 
-  const { items, limitations } = adapter.extract({ document, url });
-  const deduped = dedupeMediaItems(items).slice(0, MAX_SCAN_ITEMS);
+  const discovery = adapter.discoverMedia({ document, url });
+  const deduped = dedupeMediaItems(discovery.items).slice(0, MAX_SCAN_ITEMS);
 
   return {
     platform: adapter.id,
     pageUrl: url.toString(),
     scannedAt: Date.now(),
     items: deduped,
-    limitations,
+    limitations: discovery.limitations,
+    pageType: discovery.pageType,
+    account: discovery.account,
   };
 }

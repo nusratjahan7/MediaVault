@@ -1,6 +1,25 @@
+import type { AccountIdentity, PageType } from './page';
 import type { PlatformId } from './platform';
 
 export type MediaKind = 'image' | 'video';
+
+export type MediaDownloadStatus = 'available' | 'unsupported' | 'restricted' | 'unknown';
+
+export type MediaQuality = 'source' | 'hd' | 'sd' | 'unknown';
+
+export interface MediaFormat {
+  id: string;
+  label: string;
+  extension: string;
+  mimeType: string;
+  kind: MediaKind;
+  quality?: MediaQuality;
+  url?: string;
+}
+
+export interface DownloadOption extends MediaFormat {
+  isDefault: boolean;
+}
 
 export type LimitationCode =
   | 'unsupported-page'
@@ -38,6 +57,13 @@ export interface MediaItem {
   filenameHint?: string;
   downloadable: boolean;
   unsupportedReason?: string;
+  postId?: string;
+  publishedAt?: number;
+  sourcePageUrl?: string;
+  pageType?: PageType;
+  formats?: MediaFormat[];
+  downloadStatus?: MediaDownloadStatus;
+  account?: AccountIdentity;
 }
 
 export interface ScanResult {
@@ -46,4 +72,6 @@ export interface ScanResult {
   scannedAt: number;
   items: MediaItem[];
   limitations: ScanLimitation[];
+  pageType?: PageType;
+  account?: AccountIdentity | null;
 }

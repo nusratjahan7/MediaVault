@@ -1,6 +1,7 @@
 import type { MediaItem, ScanLimitation } from '@/types/media';
 import { normalizeHttpUrl } from '@/utils/url';
 import type { ExtractContext, ExtractResult } from '../types';
+import { identifyFacebookAccount } from './account';
 import {
   addLimitation,
   collectImages,
@@ -16,21 +17,6 @@ import {
 const VIDEO_PATH = /^\/(watch|reel|videos|video\.php|story\.php)/;
 const PHOTO_PATH = /^\/(photo|photos)/;
 
-function extractAuthor(document: Document): string | undefined {
-  const articleAuthor = document
-    .querySelector<HTMLAnchorElement>(
-      'h2 a[role="link"], h3 a[role="link"], strong a[role="link"], [role="article"] h2 a',
-    )
-    ?.textContent?.trim();
-
-  if (articleAuthor && articleAuthor.length <= 80) {
-    return articleAuthor;
-  }
-
-  const ogTitle = ogContent(document, 'og:title')?.replace(/\s*[|-]\s*Facebook\s*$/i, '').trim();
-  return ogTitle && ogTitle.length <= 80 ? ogTitle : undefined;
-}
-
 function extractCaption(document: Document): string | undefined {
   const node = document.querySelector<HTMLElement>(
     '[data-ad-preview="message"], [data-ad-comet-preview="message"], div[role="article"] [dir="auto"]',
@@ -45,7 +31,8 @@ export function extractFacebook({ document, url }: ExtractContext): ExtractResul
   const items: MediaItem[] = [];
   const limitations: ScanLimitation[] = [];
   const postUrl = url.toString();
-  const author = extractAuthor(document);
+  const account = identifyFacebookAccount(document);
+  const author = account?.username ?? account?.displayName;
   const caption = extractCaption(document);
 
   const ogImage = normalizeHttpUrl(ogContent(document, 'og:image'), url.href) ?? undefined;
