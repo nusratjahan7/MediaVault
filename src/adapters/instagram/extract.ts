@@ -3,6 +3,7 @@ import type { MediaItem, ScanLimitation } from '@/types/media';
 import { normalizeHttpUrl } from '@/utils/url';
 import type { ExtractContext, ExtractResult } from '../types';
 import { identifyInstagramAccount } from './account';
+import { detectInstagramPageType } from './page-type';
 import {
   addLimitation,
   collectImages,
@@ -11,17 +12,39 @@ import {
   dedupeMediaItems,
   detectLoginWall,
   detectPrivateContent,
+  imageSource,
   ogContent,
   trimCaption,
 } from '../shared/dom';
+import { postIdFromUrl } from '../shared/metadata';
 
-const POST_PATH = /^\/(p|reel|reels|tv)\//;
+function postLinkFor(element: Element, base: URL): string | undefined {
+  const anchor =
+    element.closest<HTMLAnchorElement>('a[href*="/p/"], a[href*="/reel/"]') ??
+    element
+      .closest('article')
+      ?.querySelector<HTMLAnchorElement>('a[href*="/p/"], a[href*="/reel/"]');
+
+  return normalizeHttpUrl(anchor?.getAttribute('href'), base.href) ?? undefined;
+}
+
+function postMetadata(link: string | undefined, fallback: string) {
+  if (!link) {
+    return { postUrl: fallback, postId: undefined };
+  }
+
+  const parsed = new URL(link);
+  return { postUrl: link, postId: postIdFromUrl('instagram', parsed) };
+}
 
 export function extractInstagram({ document, url }: ExtractContext): ExtractResult {
   const items: MediaItem[] = [];
   const limitations: ScanLimitation[] = [];
   const postUrl = url.toString();
-  const isPostPage = POST_PATH.test(url.pathname);
+  const pageType = detectInstagramPageType(url);
+  const isPostPage =
+    pageType === 'post' || pageType === 'reel' || pageType === 'video';
+  const isStoryPage = pageType === 'story' || pageType === 'highlight';
   const author = identifyInstagramAccount(document)?.username;
   const caption = trimCaption(
     ogContent(document, 'og:description') ?? ogContent(document, 'description'),
@@ -33,6 +56,30 @@ export function extractInstagram({ document, url }: ExtractContext): ExtractResu
       ogContent(document, 'og:video:secure_url') ?? ogContent(document, 'og:video'),
       url.href,
     ) ?? undefined;
+
+  if (pageType === 'profile') {
+    const profileImage = document.querySelector<HTMLImageElement>(
+      'header img[alt*="profile picture" i], header img[alt*="profile photo" i], main img[alt*="profile picture" i], main img[alt*="profile photo" i]',
+    );
+    const profileUrl =
+      (profileImage ? imageSource(profileImage, url.href) : undefined) ??
+      ogImage ??
+      undefined;
+
+    if (profileUrl) {
+      items.push(
+        createMediaItem('instagram', 'image', profileUrl, {
+          thumbnailUrl: profileUrl,
+          width: profileImage?.naturalWidth || profileImage?.width || undefined,
+          height: profileImage?.naturalHeight || profileImage?.height || undefined,
+          postUrl,
+          author,
+          caption: 'Profile picture',
+          filenameHint: 'instagram-profile-picture',
+        }),
+      );
+    }
+  }
 
   if (ogVideo) {
     items.push(
@@ -56,31 +103,50 @@ export function extractInstagram({ document, url }: ExtractContext): ExtractResu
     );
   }
 
+  let linkedGridImages = 0;
+  const imageSelector = isStoryPage
+    ? '[role="dialog"] img, main img, section img'
+    : 'article img, main img, a[href*="/p/"] img, a[href*="/reel/"] img';
+
   for (const candidate of collectImages(document, url.href, {
-    selector: 'article img, main img',
+    selector: imageSelector,
     minSize: MIN_IMAGE_SIZE,
   })) {
+    const linked = postLinkFor(candidate.element, url);
+    if (linked) {
+      linkedGridImages += 1;
+    }
+
+    const meta = postMetadata(linked, postUrl);
+
     items.push(
       createMediaItem('instagram', 'image', candidate.url, {
         thumbnailUrl: candidate.url,
         width: candidate.width,
         height: candidate.height,
-        postUrl,
+        postUrl: meta.postUrl,
+        postId: meta.postId,
         author,
         caption,
-        filenameHint: candidate.alt ?? 'instagram-photo',
+        filenameHint: linked
+          ? 'instagram-grid-image'
+          : (candidate.alt ?? 'instagram-photo'),
       }),
     );
   }
 
   for (const video of collectVideos(document, url.href)) {
+    const linked = postLinkFor(video.element, url);
+    const meta = postMetadata(linked, postUrl);
+
     if (video.src) {
       items.push(
         createMediaItem('instagram', 'video', video.src, {
           thumbnailUrl: video.poster,
           width: video.width,
           height: video.height,
-          postUrl,
+          postUrl: meta.postUrl,
+          postId: meta.postId,
           author,
           caption,
           filenameHint: 'instagram-video',
@@ -103,7 +169,8 @@ export function extractInstagram({ document, url }: ExtractContext): ExtractResu
             thumbnailUrl: video.poster,
             width: video.width,
             height: video.height,
-            postUrl,
+            postUrl: meta.postUrl,
+            postId: meta.postId,
             author,
             caption,
             downloadable: false,
@@ -140,6 +207,24 @@ export function extractInstagram({ document, url }: ExtractContext): ExtractResu
       severity: 'info',
       message:
         'Carousels only include slides that Instagram has rendered. Scroll through the post to load every slide, then scan again.',
+    });
+  }
+
+  if (linkedGridImages > 0 && !isPostPage) {
+    addLimitation(limitations, {
+      code: 'partial-extraction',
+      severity: 'info',
+      message:
+        'Profile-grid downloads save the image Instagram renders in the grid. Open a post to save its original media and all carousel slides.',
+    });
+  }
+
+  if (isStoryPage && deduped.length === 0) {
+    addLimitation(limitations, {
+      code: 'unsupported-media',
+      severity: 'warning',
+      message:
+        'This story or highlight does not expose a direct media file. MediaVault does not bypass login, private-account, or access restrictions.',
     });
   }
 

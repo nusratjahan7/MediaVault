@@ -75,6 +75,15 @@ All identities include `platform`, optional `username`, optional `displayName`, 
 
 Missing values stay `undefined`; no placeholder account, date, or media URL is fabricated.
 
+### Instagram specifics
+
+- Profile pages add the visible profile picture (header/profile image or profile `og:image`).
+- Profile/tagged/saved grid images carry their linked post URL and post id, so per-item actions can target the right post.
+- Story/highlight pages use dialog/section/main selectors; only direct image/video URLs are offered.
+- `in-page.ts` owns placement selectors for post action rows, grid anchors, and story/highlight containers.
+- Grid images are the rendered grid asset, not guaranteed originals; a limitation states this.
+- Login/private pages produce no in-page targets and blocking limitations.
+
 ## Download options
 
 `getDownloadOptions(item)` returns only formats with a direct, permitted `http(s)` URL.

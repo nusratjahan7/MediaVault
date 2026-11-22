@@ -146,3 +146,17 @@ export async function countHistoryByStatus(status: DownloadStatus): Promise<numb
   const db = await getDb();
   return db.countFromIndex('history', 'by-status', status);
 }
+
+export async function hasCompletedMedia(
+  mediaId: string,
+  mediaUrl: string,
+): Promise<boolean> {
+  const db = await getDb();
+  const entries = await db.getAll('history');
+
+  return entries.some(
+    (entry) =>
+      entry.status === 'completed' &&
+      (entry.item.id === mediaId || entry.item.url === mediaUrl),
+  );
+}

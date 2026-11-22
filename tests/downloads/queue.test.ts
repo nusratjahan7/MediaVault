@@ -112,6 +112,22 @@ describe('download queue', () => {
     expect(chromeMock.downloads.cancel).toHaveBeenCalledWith(downloadId);
   });
 
+  it('reports already-downloaded items when Skip Downloaded is enabled', async () => {
+    await saveSettings({ skipDownloaded: true });
+
+    const first = await enqueueDownloads([ITEM]);
+    const downloadId = await waitFor(() => getLastDownloadId());
+    completeDownload(downloadId);
+    await waitForStatus(first.accepted[0]!.id, 'completed');
+
+    const second = await enqueueDownloads([ITEM]);
+
+    expect(second.accepted).toHaveLength(0);
+    expect(second.skipped).toBe(0);
+    expect(second.alreadyDownloaded).toBe(1);
+    expect(chromeMock.downloads.download).toHaveBeenCalledTimes(1);
+  });
+
   it('does not write history when history is disabled', async () => {
     await saveSettings({ historyEnabled: false });
 

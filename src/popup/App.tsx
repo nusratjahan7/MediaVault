@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Globe2, ShieldCheck, Sparkles } from 'lucide-react';
+import { Copy, Globe2, ShieldCheck, Sparkles } from 'lucide-react';
 import { getAdapterForUrl } from '@/adapters/registry';
 import { PageContextCard } from '@/components/context/PageContextCard';
 import { PlatformBadge } from '@/components/media/PlatformBadge';
@@ -25,6 +25,7 @@ import type { MediaItem } from '@/types/media';
 import type { PlatformId } from '@/types/platform';
 import type { PageContext } from '@/types/ui';
 import { getErrorMessage } from '@/utils/errors';
+import { buildCaptionExport, copyText } from '@/utils/export';
 import { inferPageKind } from '@/utils/page-context';
 import { DemoToolbar } from './DemoToolbar';
 import { PopupHeader } from './PopupHeader';
@@ -81,13 +82,16 @@ export function App() {
     const first =
       liveScan.result.items.find((item) => item.author) ?? liveScan.result.items[0];
     const account = liveScan.result.account ?? undefined;
+    const caption = liveScan.result.items.find(
+      (item) => item.caption && item.caption !== 'Profile picture',
+    )?.caption;
 
     return {
       platform: livePlatform,
       author: account?.username ?? first?.author,
       accountName: account?.displayName ?? account?.username ?? first?.author,
       handle: account?.username ?? first?.author,
-      pageTitle: first?.caption ?? url.pathname,
+      pageTitle: caption ?? url.pathname,
       pageUrl: liveScan.result.pageUrl,
       pageKind: liveScan.result.pageType ?? inferPageKind(url),
       mediaCount: liveScan.result.items.length,
@@ -192,6 +196,31 @@ export function App() {
   const addMockMedia = queue.addMockMedia;
   const clearSelection = selection.clear;
 
+  const handleExportCaption = useCallback(async () => {
+    const result = scan.result;
+    const caption =
+      result?.items.find(
+        (item) => item.caption && item.caption !== 'Profile picture',
+      )?.caption ?? pageContext?.pageTitle;
+    const author =
+      pageContext?.handle ??
+      pageContext?.author ??
+      result?.account?.username;
+    const sourceUrl = pageContext?.pageUrl ?? result?.pageUrl;
+
+    const copied = await copyText(
+      buildCaptionExport({ caption, author, sourceUrl }),
+    );
+
+    toast({
+      title: copied ? 'Caption copied' : 'Could not copy',
+      description: copied
+        ? 'Caption, account, and source URL are on your clipboard.'
+        : 'Clipboard access is unavailable in this context.',
+      variant: copied ? 'success' : 'error',
+    });
+  }, [pageContext, scan.result, toast]);
+
   const queueMedia = useCallback(
     async (target: MediaItem[]) => {
       if (target.length === 0) {
@@ -225,22 +254,37 @@ export function App() {
 
       if (result.accepted.length === 0) {
         toast({
-          title: 'Nothing to download',
-          description: 'The selected items have no direct file link.',
-          variant: 'error',
+          title:
+            result.alreadyDownloaded > 0
+              ? 'Already downloaded'
+              : 'Nothing to download',
+          description:
+            result.alreadyDownloaded > 0
+              ? 'Skip Downloaded is enabled and these items are already in your history.'
+              : 'The selected items have no direct file link.',
+          variant: result.alreadyDownloaded > 0 ? 'default' : 'error',
         });
         return;
       }
 
       clearSelection();
       setSelectionMode(false);
+
+      const notes: string[] = [];
+      if (result.alreadyDownloaded > 0) {
+        notes.push(`${result.alreadyDownloaded} already downloaded.`);
+      }
+      if (result.skipped > 0) {
+        notes.push(`${result.skipped} skipped because they have no direct link.`);
+      }
+
       toast({
         title: `${result.accepted.length} ${
           result.accepted.length === 1 ? 'download' : 'downloads'
         } queued`,
         description:
-          result.skipped > 0
-            ? `${result.skipped} item(s) skipped because they have no direct link.`
+          notes.length > 0
+            ? notes.join(' ')
             : 'Progress appears below. Files are saved to your download folder.',
         variant: 'success',
       });
@@ -349,13 +393,26 @@ export function App() {
     return (
       <div>
         {pageContext && (
-          <div className="animate-rise px-3 pt-3">
+          <div className="animate-rise space-y-1.5 px-3 pt-3">
             <PageContextCard
               context={pageContext}
               account={demo ? previewAccount : undefined}
               onSwitchAccount={demo ? openAccounts : undefined}
               compact
             />
+            {pageContext.platform === 'instagram' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                block
+                onClick={() => {
+                  void handleExportCaption();
+                }}
+                icon={<Copy className="size-3.5" aria-hidden="true" />}
+              >
+                Copy caption & source URL
+              </Button>
+            )}
           </div>
         )}
 

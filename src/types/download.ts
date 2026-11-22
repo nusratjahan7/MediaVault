@@ -57,4 +57,5 @@ export interface DownloadJobSummary {
 export interface EnqueueResult {
   accepted: DownloadJobSummary[];
   skipped: number;
+  alreadyDownloaded: number;
 }

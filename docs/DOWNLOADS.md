@@ -61,6 +61,12 @@ Expired signed URLs are never rewritten, guessed, or fetched through a proxy.
 - Settings → Downloads → **Ask where to save each file** sets `saveAs: true`, invoking Chrome's native folder picker. When off, Chrome uses the default download folder plus the configured subfolder.
 - Original direct media URLs are used as-is; no transcoding or re-hosting occurs.
 
+## Skip Downloaded
+
+When Settings → Downloads → **Skip Downloaded** is enabled, `enqueue` checks local history for a completed entry with the same media id or URL. Duplicates throw `ALREADY_DOWNLOADED`; the queue facade counts them separately so the popup and in-page toast can say “already downloaded” instead of “no direct link”.
+
+The check uses completed local history only. Disabling the setting, deleting the completed entry, or disabling history allows another copy.
+
 ## History and reconciliation
 
 - Every job writes the existing `HistoryEntry` shape with status, bytes, total bytes, paused flag, download id, and error.

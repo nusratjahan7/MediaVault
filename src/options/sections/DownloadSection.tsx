@@ -123,6 +123,24 @@ export function DownloadSection() {
           />
         </div>
 
+        <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-fg">Skip Downloaded</p>
+            <p className="mt-0.5 max-w-[60ch] text-[11px] leading-relaxed text-muted">
+              When media with the same identity already has a completed download in local
+              history, do not add it to the queue again. Turn this off to intentionally download
+              another copy.
+            </p>
+          </div>
+          <Toggle
+            checked={settings.skipDownloaded}
+            onChange={(checked) => {
+              void updateSettings({ skipDownloaded: checked });
+            }}
+            label="Skip already downloaded media"
+          />
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => void save()} disabled={!dirty} loading={saving}>
             Save changes

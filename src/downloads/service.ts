@@ -5,6 +5,7 @@ import {
   findHistoryByDownloadId,
   getActiveHistoryEntries,
   getHistoryEntry,
+  hasCompletedMedia,
   pruneHistory,
   queryHistory,
   updateHistoryEntry,
@@ -239,6 +240,17 @@ export class DownloadService {
     this.ensureListener();
 
     const settings = await getSettings();
+
+    if (settings.skipDownloaded) {
+      const alreadyDownloaded = await hasCompletedMedia(source.id, source.url);
+      if (alreadyDownloaded) {
+        throw new AppError(
+          'ALREADY_DOWNLOADED',
+          'This media is already in your download history.',
+        );
+      }
+    }
+
     const filename = buildDownloadPath(source, settings);
     const now = Date.now();
     const job: InternalJob = {

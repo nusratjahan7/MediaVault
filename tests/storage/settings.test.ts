@@ -87,4 +87,10 @@ describe('settings storage', () => {
     expect((await saveSettings({ askWhereToSave: true })).askWhereToSave).toBe(true);
     expect((await getSettings(true)).askWhereToSave).toBe(true);
   });
+
+  it('persists the Skip Downloaded preference', async () => {
+    expect((await getSettings()).skipDownloaded).toBe(false);
+    expect((await saveSettings({ skipDownloaded: true })).skipDownloaded).toBe(true);
+    expect((await getSettings(true)).skipDownloaded).toBe(true);
+  });
 });

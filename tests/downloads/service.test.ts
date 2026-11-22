@@ -260,6 +260,22 @@ describe('DownloadService', () => {
     expect(saved?.source.url).toBe(SOURCE.url);
   });
 
+  it('skips media that already has a completed download when enabled', async () => {
+    const record = await service.enqueue(SOURCE);
+    service.start(record.id);
+    const downloadId = await waitFor(() => getLastDownloadId());
+    await waitForAttachedDownload(record.id, downloadId);
+    completeDownload(downloadId);
+    await waitForState(record.id, 'completed');
+
+    await saveSettings({ skipDownloaded: true });
+
+    await expect(service.enqueue(SOURCE)).rejects.toMatchObject({
+      code: 'ALREADY_DOWNLOADED',
+    });
+    expect(chromeMock.downloads.download).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects sources without a permitted direct URL', async () => {
     await expect(
       service.enqueue({ ...SOURCE, url: 'blob:https://www.instagram.com/1' }),

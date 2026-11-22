@@ -10,6 +10,8 @@ Module 3 (Platform Detection & Media Discovery) is complete: a shared `PlatformA
 
 Module 4 (Single Media Download System) is complete: a platform-independent `DownloadService` with typed states, Chrome-confirmed completion, real byte progress, pause/resume, cancellation, retry, Save As folder choice, duplicate handling, local history, and startup reconciliation. The engine uses Chrome's Downloads API directly and never proxies media.
 
+Module 5 (Instagram Media Downloader) is complete: profile pictures, grid media with linked post context, carousel/reel/story/highlight discovery, inline post-action buttons, profile-grid overlay buttons, caption/source export, and Skip Downloaded deduplication. Instagram selectors live in the adapter; the overlay UI is isolated and generic.
+
 ## 2. Runtime topology
 
 ```
@@ -42,8 +44,10 @@ Module 4 (Single Media Download System) is complete: a platform-independent `Dow
 │  content/index.ts    injection guard + SCAN_PAGE responder                  │
 │  content/scanner.ts  adapter resolution + discovery + dedupe + limits       │
 │  content/observer.ts SPA URL/mutation invalidation                          │
+│  content/in-page-actions.ts  shadow-DOM download overlay + toasts           │
 │  adapters/*          PlatformAdapter: detect page/account, discover media,  │
 │                      normalize metadata/formats, fail gracefully            │
+│  adapters/instagram/in-page.ts  post/grid/story button placement            │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -58,7 +62,7 @@ Module 4 (Single Media Download System) is complete: a platform-independent `Dow
 | Path | Responsibility |
 | --- | --- |
 | `src/background/` | Service-worker bootstrap, message router, request handlers, site registration |
-| `src/content/` | Injected scanner lifecycle, SPA invalidation, scan response |
+| `src/content/` | Injected scanner lifecycle, SPA invalidation, scan response, isolated in-page download overlay |
 | `src/popup/` | Page/account context, permission gate, actions, selection mode, queue preview, scan results |
 | `src/options/` | Settings sections, UI preview mode, local data controls |
 | `src/sidepanel/` | Library and Queue views with history/account/settings links |
@@ -115,6 +119,14 @@ getDownloadOptions(item)        // DownloadOption[]
 
 Normalized metadata never assumes parity across platforms. Missing usernames, dates, post ids, thumbnails, formats, or direct URLs remain `undefined` rather than being fabricated. Page-specific notes (blob streams, signed URL expiry, carousel limits) travel as `ScanLimitation`s. Page types and account detection are covered in [ADAPTERS.md](./ADAPTERS.md).
 
+### Instagram-specific layer
+
+- `extract.ts` adds profile pictures on profile pages, direct story/highlight media, and profile-grid images with each item's linked post URL/id.
+- `in-page.ts` owns all placement selectors: post action rows, grid anchors, story/highlight media containers. It returns no targets on login/private pages.
+- `verify-dist`-built content code mounts a shadow-DOM overlay only for Instagram, only after site access is enabled, and not in demo mode. Grid buttons save the rendered grid image and explicitly tell the user to open the post for original media.
+- Caption + account + source URL export lives in `utils/export.ts`; Instagram surfaces the copy action in the popup.
+- Skip Downloaded is enforced in the shared download engine using local completed history (media id or URL). See [INSTAGRAM.md](./INSTAGRAM.md).
+
 ## 5. Message passing
 
 **UI → background** — `services/messaging.ts`
@@ -155,7 +167,7 @@ Error codes: `PERMISSION_DENIED`, `NOT_SUPPORTED`, `TAB_UNAVAILABLE`, `CONTENT_S
 
 | Store | Key / database | Shape |
 | --- | --- | --- |
-| `chrome.storage.local` | `mediavault:settings:v1` | `{ version: 1, data: Settings }` (includes `demoMode`) |
+| `chrome.storage.local` | `mediavault:settings:v1` | `{ version: 1, data: Settings }` (includes `demoMode`, `askWhereToSave`, `skipDownloaded`) |
 | `chrome.storage.local` | `mediavault:sites:v1` | `{ version: 1, platforms: PlatformId[] }` |
 | `chrome.storage.local` | `mediavault:preview:accounts:v1` | Mock-only selected preview account per platform |
 | IndexedDB | `mediavault` v1 → `history` | `HistoryEntry`, keyed by `id`, indexes on `createdAt`, `platform`, `status` |
@@ -225,6 +237,8 @@ getHistory(limit?)              // session + persisted history merged
 
 **Retry:** failed/cancelled records reuse their history id and source, regenerate a safe filename, and start a new Chrome download. Expired URLs result in actionable failure messages; they are never rewritten or guessed.
 
+**Skip Downloaded:** when enabled, `enqueue` checks local history for a completed item with the same media id or URL and throws `ALREADY_DOWNLOADED`. The queue facade reports the count so popup and in-page surfaces can show a distinct message.
+
 **Destination and duplicates:** `saveAs` is driven by Settings → Downloads → Ask where to save each file; otherwise Chrome uses the default download folder plus the configured subfolder. Filenames are sanitized and `conflictAction: 'uniquify'` prevents overwrites.
 
 **Reconciliation:** on startup, active history rows are searched in Chrome. In-progress downloads are reattached to polling, completed rows are finalized with byte counts, and missing/interrupted rows become failed with a clear message.
@@ -280,7 +294,7 @@ npm run build
 
 - Strict TypeScript across `src/` and build configs.
 - ESLint 9 with React hooks rules.
-- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, download service states/progress/pause/cancel/retry/Save As/duplicates, queue integration, storage, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
+- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, Instagram profile pictures/grid/story discovery, in-page action placement and click handling, caption export, Skip Downloaded, download service states/progress/pause/cancel/retry/Save As/duplicates, queue integration, storage, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
 - `verify-dist.mjs` checks the built package as Chrome would consume it, including all five HTML surfaces.
 
 Live Chrome E2E against real social pages has **not** been run in this environment. The manual QA matrix is in the README.
@@ -292,5 +306,7 @@ Live Chrome E2E against real social pages has **not** been run in this environme
 - Media URLs are read from the page; signed URLs are never modified or forged.
 - Downloads are fetched by Chrome directly from the permitted media URL; nothing is proxied or uploaded.
 - Platform thumbnails load directly from the platform CDN with `referrerPolicy="no-referrer"`; nothing is proxied.
+- In-page buttons read only media already visible on the authorized page; login/private pages receive no buttons.
+- Caption export copies text locally to the clipboard; nothing is uploaded.
 - Demo thumbnails are local SVG data URIs and demo actions never call Chrome Downloads.
 - Private/restricted content is reported as a limitation, never bypassed.

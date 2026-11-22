@@ -9,6 +9,7 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 - [Architecture](./docs/ARCHITECTURE.md) — module boundaries, messaging, errors, storage, permissions, build pipeline
 - [Platform adapters](./docs/ADAPTERS.md) — detection, account identity, metadata, formats, resilience
 - [Download engine](./docs/DOWNLOADS.md) — service API, states, progress, cancellation, retry, folder choice
+- [Instagram module](./docs/INSTAGRAM.md) — page/media support, in-page buttons, profile grids, stories, Skip Downloaded
 - [UI guide](./docs/UI.md) — design system, surfaces, components, demo mode and the mock boundary
 - [Privacy policy](./PRIVACY.md)
 - [Module status](#module-status)
@@ -19,6 +20,7 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 - **Module 2 — Premium MediaVault UI:** complete. Popup, side panel, settings, full history page, account selection page, bulk selection toolbar, queue/progress interface, empty/error states, and toasts. A clearly isolated demo-data mode makes every surface reviewable without touching real downloads.
 - **Module 3 — Platform Detection & Media Discovery:** complete. A shared `PlatformAdapter` contract, per-platform page type/account detection, normalized metadata (post id/date/source/formats/status), download options, graceful failure handling, and dedicated detection/metadata tests.
 - **Module 4 — Single Media Download System:** complete. A platform-independent `DownloadService` with typed states, Chrome-confirmed completion, real byte progress, pause/resume, cancellation, retry, Save As folder choice, duplicate handling, history persistence, and startup reconciliation.
+- **Module 5 — Instagram Media Downloader:** complete. Photo/video/carousel/reel/profile-picture/story/highlight discovery, inline post action buttons, profile-grid overlay buttons, caption/source export, and Skip Downloaded deduplication.
 
 All downloads use Chrome's Downloads API directly. No media is uploaded, proxied, or fetched through an external server.
 
@@ -32,6 +34,10 @@ All downloads use Chrome's Downloads API directly. No media is uploaded, proxied
 - Lets Chrome prompt for a destination folder (Save As) or uses the configured local subfolder.
 - Tracks local download history in IndexedDB with a side-panel library and a full history page.
 - Shows page/account context, current/bulk download actions, a select mode, and a live queue preview.
+- Adds Instagram download buttons beside post actions and on accessible profile-grid items.
+- Saves profile pictures, carousel slides, reels, and directly accessible story/highlight media where permitted.
+- Copies caption + account + source URL from the popup.
+- Skips already-downloaded media when Skip Downloaded is enabled.
 - Offers a per-platform account-selection preview and a fully mock-driven interface preview.
 - Gives you one-click per-site access, revocable at any time.
 
@@ -96,7 +102,11 @@ This watches both Vite builds into `dist/`. Reload the extension from `chrome://
 4. Scan runs automatically. Use **Download current**, **Bulk download**, or **Start select** for granular selection.
 5. Open **Library** in the side panel to watch real Chrome progress, cancel, retry, reveal, or remove entries; open the full **History** and **Accounts** pages from the header or footer.
 
+On Instagram, a **Download** button appears beside the post action row, and compact download buttons appear on accessible profile-grid items. Profile-grid buttons save the rendered grid image; open a post for its original media. Story/highlight buttons appear only when the page exposes a direct media file.
+
 To choose the destination folder yourself, enable **Settings → Downloads → Ask where to save each file**. Chrome then shows its native Save As dialog for every download. Otherwise Chrome saves to your default download folder plus the configured subfolder.
+
+Enable **Settings → Downloads → Skip Downloaded** to block media already completed in local history. The popup and in-page toasts distinguish “already downloaded” from unavailable media.
 
 Site access is stored per platform. Revoke it in Settings → Site access.
 
@@ -116,7 +126,7 @@ Mock content lives exclusively in [`src/mocks/`](./src/mocks) and is documented 
 ```
 src/
   background/        MV3 service worker: message router, scan and site handlers
-  content/           Silent SPA-aware scanner (IIFE, injected only after approval)
+  content/           Silent SPA-aware scanner, guarded in-page download overlay (IIFE)
   popup/             Platform/page context, actions, selection, queue preview
   options/           Appearance, downloads, site access, UI preview, privacy/data
   sidepanel/         Library and Queue tabs
@@ -128,6 +138,7 @@ src/
   mocks/             UI-only sample accounts/media/queue/history/preview preferences
   adapters/          PlatformAdapter contract, base pipeline, metadata normalization
     instagram/ facebook/ tiktok/   adapter + page-type + account + extraction
+    instagram/                    profile stories/grid/profile-picture + in-page targets
   downloads/         DownloadService engine, Chrome client, safe filename builder, queue facade
   storage/           chrome.storage settings/sites + IndexedDB history
   types/             Strict shared contracts, message unions, UI contracts
@@ -167,7 +178,11 @@ retry()         → fresh pending attempt from the same source
 getStatus() / getHistory()
 ```
 
-Typed states: `pending`, `downloading`, `completed`, `failed`, `cancelled`. Completion is set **only after Chrome reports `state === "complete"`**. Progress comes only from Chrome's byte counters (capped at 99% until confirmation); there is no simulated progress. Failed network/expired-URL errors are translated into actionable messages and never retried as a success. See [docs/DOWNLOADS.md](./docs/DOWNLOADS.md).
+Typed states: `pending`, `downloading`, `completed`, `failed`, `cancelled`. Completion is set **only after Chrome reports `state === "complete"`**. Progress comes only from Chrome's byte counters (capped at 99% until confirmation); there is no simulated progress. Failed network/expired-URL errors are translated into actionable messages and never retried as a success. With **Skip Downloaded** enabled, a completed media id/URL is not enqueued again. See [docs/DOWNLOADS.md](./docs/DOWNLOADS.md).
+
+### Instagram in-page actions
+
+Instagram-specific selectors live in `src/adapters/instagram/in-page.ts`. The generic shadow-DOM overlay (`src/content/in-page-actions.ts`) injects download buttons beside post actions, on accessible profile-grid items, and on active story/highlight media; it does not mount on login/private pages or in demo mode. See [docs/INSTAGRAM.md](./docs/INSTAGRAM.md).
 
 ### Build design
 
@@ -207,12 +222,15 @@ Known limits (also shown in-product):
 6. Pause/resume depends on Chrome supporting it for that download.
 7. “Ask where to save” prompts once per file; multi-file queues may show multiple dialogs.
 8. Carousels/slideshows include only rendered slides.
-9. Profile/feed crawling is intentionally absent.
-10. Page type/account/date detection depends on what the platform exposes; unavailable fields remain empty.
-11. Stories, highlights, tagged posts, and saved collections are scanned only when the content is already visible/accessible.
-12. Chrome 116+ desktop only.
-13. Platform DOM changes can break extraction until adapters are updated.
-14. Chrome Web Store review may scrutinize social downloader extensions; use is limited to content you are authorized to save.
+9. Instagram profile-grid buttons save the rendered grid image; open the post for original media.
+10. Stories/highlights are saved only when the page exposes a direct file; protected content is unavailable.
+11. Instagram in-page buttons depend on current DOM action rows/grid links and are not shown on login/private pages or in demo mode.
+12. Profile/feed crawling is intentionally absent.
+13. Page type/account/date detection depends on what the platform exposes; unavailable fields remain empty.
+14. Stories, highlights, tagged posts, and saved collections are scanned only when the content is already visible/accessible.
+15. Chrome 116+ desktop only.
+16. Platform DOM changes can break extraction and in-page button placement until adapters are updated.
+17. Chrome Web Store review may scrutinize social downloader extensions; use is limited to content you are authorized to save.
 
 ## Testing and verification
 
@@ -221,11 +239,11 @@ Verified in this repository:
 ```bash
 npm run typecheck   # strict TypeScript, app + configs
 npm run lint        # ESLint, zero warnings/errors
-npm run test:run    # 127 tests passing
+npm run test:run    # 140 tests passing
 npm run build       # loadable dist/ + manifest/package verification
 ```
 
-Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, the download service (pending/downloading/completed/failed/cancelled, browser-confirmed completion, byte progress, pause/resume, cancellation, retry, Save As, duplicates, typed history), filename safety, URL normalization, settings/history/sites storage, typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
+Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, the download service (pending/downloading/completed/failed/cancelled, browser-confirmed completion, byte progress, pause/resume, cancellation, retry, Save As, duplicates, Skip Downloaded, typed history), Instagram profile pictures/grid/story targets, in-page overlay injection, caption export, filename safety, URL normalization, settings/history/sites storage, typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
 
 **Not yet verified here:** live end-to-end downloads against Instagram, Facebook, and TikTok. That requires loading `dist/` in Chrome and testing with real pages you are authorized to access. The manual QA checklist:
 
@@ -234,6 +252,10 @@ Coverage includes platform/page/account detection, metadata normalization, forma
 - Enabling a site allows scanning without a reload.
 - Demo mode shows the platform switcher, page/account card, queue preview, and simulated current/bulk/select actions without calling Chrome Downloads.
 - On a live post/reel/story/highlight/tagged/saved page, the context card reflects the adapter-detected page type and visible account.
+- Instagram post action rows show an inline Download button; profile-grid items show compact download overlays; login/private pages show none.
+- Profile picture, carousel, reel, and direct story/highlight media are discoverable and downloadable where accessible.
+- Copy caption & source URL places the expected text on the clipboard.
+- Skip Downloaded blocks a second completed copy and reports it distinctly.
 - Account selection persists and the popup page-context card reflects the chosen mock account.
 - Full history page shows stats, filters, empty state, and clear confirmation.
 - Side panel switches between Library and Queue; footer links open history/accounts/settings.

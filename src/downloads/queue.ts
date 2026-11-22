@@ -1,5 +1,6 @@
 import type { EnqueueResult } from '@/types/download';
 import type { MediaItem } from '@/types/media';
+import { isAppError } from '@/utils/errors';
 import { isHttpUrl } from '@/utils/url';
 import {
   downloadService,
@@ -14,6 +15,7 @@ import {
 export async function enqueueDownloads(items: MediaItem[]): Promise<EnqueueResult> {
   const accepted: EnqueueResult['accepted'] = [];
   let skipped = 0;
+  let alreadyDownloaded = 0;
 
   for (const item of items) {
     if (!item.downloadable || !isHttpUrl(item.url)) {
@@ -31,13 +33,17 @@ export async function enqueueDownloads(items: MediaItem[]): Promise<EnqueueResul
         filename: record.filename,
         status: 'queued',
       });
-    } catch {
-      skipped += 1;
+    } catch (error) {
+      if (isAppError(error) && error.code === 'ALREADY_DOWNLOADED') {
+        alreadyDownloaded += 1;
+      } else {
+        skipped += 1;
+      }
     }
   }
 
   downloadService.start();
-  return { accepted, skipped };
+  return { accepted, skipped, alreadyDownloaded };
 }
 
 export function cancelQueuedDownload(historyId: string): Promise<boolean> {

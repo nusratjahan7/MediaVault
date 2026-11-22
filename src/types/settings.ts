@@ -9,4 +9,5 @@ export interface Settings {
   maxHistoryEntries: number;
   demoMode: boolean;
   askWhereToSave: boolean;
+  skipDownloaded: boolean;
 }

@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: Settings = {
   maxHistoryEntries: 500,
   demoMode: false,
   askWhereToSave: false,
+  skipDownloaded: false,
 };
 
 interface SettingsEnvelope {
@@ -78,6 +79,10 @@ export function coerceSettings(value: unknown): Settings {
     askWhereToSave: coerceBoolean(
       value.askWhereToSave,
       DEFAULT_SETTINGS.askWhereToSave,
+    ),
+    skipDownloaded: coerceBoolean(
+      value.skipDownloaded,
+      DEFAULT_SETTINGS.skipDownloaded,
     ),
   };
 }

@@ -75,6 +75,16 @@ Rules enforced by design:
 - **Error:** scan failure, queue unavailable, history fetch failure, permission rejection.
 - **Success:** toasts for preview actions, settings saves, account selection, and live download queueing.
 
+## Instagram in-page actions
+
+- A **Download** button is injected into supported post action rows inside an isolated shadow root.
+- Accessible profile-grid items get a compact overlay download button; story/highlight pages get one overlay button on the active media.
+- Login/private pages and demo mode receive no in-page buttons.
+- Grid buttons save the rendered grid image and show a toast telling the user to open the post for original media.
+- Feedback is shown in a shadow-DOM toast stack; no page CSS leaks into the controls.
+
+The popup also offers **Copy caption & source URL** for Instagram and distinguishes “already downloaded” from unavailable media when Skip Downloaded is on.
+
 ## Live download feedback
 
 - Queue rows show Chrome-reported percentage progress and byte counts; no percentage is invented. If Chrome has no total size, the row uses an indeterminate bar.
