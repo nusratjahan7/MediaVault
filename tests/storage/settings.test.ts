@@ -166,6 +166,31 @@ describe('settings storage', () => {
     expect(settings.videoQuality).toBe('highest');
   });
 
+  it('defaults and validates advanced download settings', async () => {
+    const defaults = await getSettings();
+    expect(defaults.downloadNewMediaOnly).toBe(false);
+    expect(defaults.retryCount).toBe(0);
+    expect(defaults.confirmBulkDownload).toBe(false);
+    expect(defaults.showDownloadNotifications).toBe(false);
+    expect(defaults.autoClearHistoryDays).toBe(0);
+
+    const saved = await saveSettings({
+      downloadNewMediaOnly: true,
+      retryCount: 9,
+      confirmBulkDownload: true,
+      showDownloadNotifications: true,
+      autoClearHistoryDays: 5,
+    });
+
+    expect(saved.downloadNewMediaOnly).toBe(true);
+    expect(saved.retryCount).toBe(3);
+    expect(saved.confirmBulkDownload).toBe(true);
+    expect(saved.showDownloadNotifications).toBe(true);
+    expect(saved.autoClearHistoryDays).toBe(0);
+    expect((await saveSettings({ retryCount: -4 })).retryCount).toBe(0);
+    expect((await saveSettings({ autoClearHistoryDays: 7 })).autoClearHistoryDays).toBe(7);
+  });
+
   it('clamps download concurrency to the supported range', async () => {
     expect((await getSettings()).downloadConcurrency).toBe(2);
     expect((await saveSettings({ downloadConcurrency: 9 })).downloadConcurrency).toBe(3);

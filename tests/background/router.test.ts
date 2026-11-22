@@ -84,6 +84,45 @@ describe('background message router', () => {
     expect(response?.ok).toBe(false);
     expect(response?.error?.code).toBe('INVALID_INPUT');
     expect(chromeMock.downloads.download).not.toHaveBeenCalled();
+
+    const malformed = await dispatch({
+      type: 'DOWNLOAD_ITEMS',
+      items: [{ id: 42, platform: 'instagram', kind: 'video', url: 'https://x', downloadable: true }],
+    });
+    expect(malformed?.ok).toBe(false);
+    expect(malformed?.error?.code).toBe('INVALID_INPUT');
+  });
+
+  it('rejects malformed request payloads before handlers run', async () => {
+    await expect(dispatch({ type: 'SCAN_TAB', tabId: 'one' })).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_INPUT' },
+    });
+    await expect(
+      dispatch({ type: 'SITES_REGISTER', platform: 'example' }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_INPUT' },
+    });
+    await expect(
+      dispatch({ type: 'HISTORY_QUERY', query: null }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_INPUT' },
+    });
+  });
+
+  it('returns a dashboard snapshot through the typed route', async () => {
+    const response = await dispatch({ type: 'DASHBOARD_QUERY' });
+
+    expect(response).toMatchObject({
+      ok: true,
+      data: {
+        entries: [],
+        completedFiles: 0,
+        completedBytes: 0,
+      },
+    });
   });
 
   it('routes retry requests through the download service', async () => {

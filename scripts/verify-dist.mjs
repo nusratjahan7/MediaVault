@@ -62,6 +62,7 @@ for (const field of ['name', 'version', 'description', 'minimum_chrome_version']
 }
 
 const extraPages = [
+  'dashboard.html',
   'history.html',
   'accounts.html',
   'stories.html',
@@ -96,6 +97,25 @@ if (manifest.content_scripts) {
 for (const forbidden of ['cookies', 'webRequest', 'tabs', 'history', 'management']) {
   if ((manifest.permissions ?? []).includes(forbidden)) {
     failures.push(`Forbidden permission present: ${forbidden}`);
+  }
+}
+
+if (!manifest.content_security_policy?.extension_pages?.includes("script-src 'self'")) {
+  failures.push('Extension pages must use a self-only script CSP.');
+}
+
+const requiredPermissions = [
+  'storage',
+  'downloads',
+  'downloads.open',
+  'notifications',
+  'scripting',
+  'activeTab',
+  'sidePanel',
+];
+for (const permission of requiredPermissions) {
+  if (!(manifest.permissions ?? []).includes(permission)) {
+    failures.push(`Expected permission missing: ${permission}`);
   }
 }
 

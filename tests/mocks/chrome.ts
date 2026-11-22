@@ -207,6 +207,8 @@ export const chromeMock = {
 
       return id;
     }),
+    open: vi.fn(async () => undefined),
+    show: vi.fn(async () => undefined),
     search: vi.fn(async (query: chrome.downloads.DownloadQuery) => {
       if (query.id !== undefined) {
         const item = downloadItems.get(query.id);
@@ -241,7 +243,6 @@ export const chromeMock = {
         downloadsOnChanged.emit({ id: downloadId, paused: { current: false } });
       }
     }),
-    show: vi.fn(async () => undefined),
   },
   tabs: {
     get: vi.fn(async (tabId: number) => {
@@ -331,6 +332,10 @@ export const chromeMock = {
       allOrigins: [],
     })),
     onRemoved: permissionsOnRemoved,
+  },
+  notifications: {
+    create: vi.fn(async () => 'notification-id'),
+    clear: vi.fn(async () => true),
   },
   sidePanel: {
     open: vi.fn(async () => undefined),

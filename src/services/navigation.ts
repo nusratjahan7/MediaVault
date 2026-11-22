@@ -1,4 +1,5 @@
 export type ExtensionPage =
+  | 'dashboard.html'
   | 'history.html'
   | 'accounts.html'
   | 'stories.html'

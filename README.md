@@ -9,6 +9,12 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 - [Architecture](./docs/ARCHITECTURE.md) — module boundaries, messaging, errors, storage, permissions, build pipeline
 - [Platform adapters](./docs/ADAPTERS.md) — detection, account identity, metadata, formats, resilience
 - [Download engine](./docs/DOWNLOADS.md) — service API, states, progress, cancellation, retry, folder choice
+- [Download dashboard](./docs/DASHBOARD.md) — stats, queue tiles, retry/cancel/open, known sizes
+- [Complete settings](./docs/SETTINGS.md) — every persisted preference, defaults, validation, resets
+- [Security audit](./docs/SECURITY_AUDIT.md) — permissions, storage, network, risks, fixes
+- [Installation](./docs/INSTALL.md) — build, load unpacked, ZIP, troubleshooting
+- [Release report](./docs/RELEASE_REPORT.md) — tested/untested status, limitations, release steps
+- [Changelog](./CHANGELOG.md)
 - [Folder organization & filenames](./docs/ORGANIZATION.md) — folders, templates, variables, sanitization, duplicates
 - [Format & quality](./docs/FORMATS.md) — image conversion, video source selection, sidecars, output reporting
 - [Instagram adapter](./docs/ADAPTERS.md#instagram-specifics) — page/media support, in-page buttons, profile grids, stories, Skip Downloaded
@@ -39,6 +45,10 @@ A premium, privacy-first Chrome extension for saving media you are authorized to
 - **Module 14 — Account Manager & Saved Lists:** complete. Local lists with create/rename/delete, profile add/remove, multi-select, sequential profile workflow, strict JSON import, and confirmed JSON export.
 - **Module 15 — Account Relationship Export:** complete. Visible followers/following rows plus user-chosen official data exports, local CSV/JSON export, filtering, field selection, and kind isolation. No crawling or privacy-control bypass.
 - **Module 16 — Privacy & Ghost Mode:** complete. Local-only status, data clearing including saved lists/workflow, permission overview, and an honest Ghost Mode section with official platform privacy links and no anonymity claims.
+- **Module 18 — Advanced Download Settings:** complete. Folder/account/media-type organization, templates, image format, thumbnails, captions, Skip Downloaded, new-media memory, concurrency, automatic retries, bulk confirmation, notifications, automatic history clearing, theme, privacy, and Reset settings.
+- **Module 19 — Download Dashboard:** complete. Active/completed/failed/cancelled counts, known sizes, queue progress, per-file tiles and errors, retry/cancel/open, and clear completed.
+- **Module 20 — Security & Privacy Audit:** complete. Permission allowlist, explicit CSP, runtime message validation, import validation, filename/path sanitization, no unsafe HTML/eval/remote code, permission explanations, and audit report.
+- **Module 21 — Production Release:** 1.0.0 build, ZIP, changelog, install guide, store description draft, privacy policy draft, release report, and real-Chrome smoke test (all pages + one real localhost download).
 
 All downloads use Chrome's Downloads API directly. No media is uploaded, proxied, or routed through a MediaVault server.
 
@@ -66,6 +76,10 @@ All downloads use Chrome's Downloads API directly. No media is uploaded, proxied
 - Exports/imports lists as JSON with strict validation and confirmation dialogs.
 - Exports visible or official-export follower/following data as local CSV or JSON with filtering and field selection.
 - Shows local-only status, permission explanations, saved-list/history clearing, and a Ghost Mode section without anonymity claims.
+- Monitors active/finished/failed/cancelled downloads in a responsive dashboard with byte-based progress and known sizes.
+- Opens completed files with Chrome's supported download action and supports dashboard retry/cancel/clear.
+- Remembers completed media IDs for “Download new media only,” even after history is cleared.
+- Optionally auto-retries failures, confirms bulk actions, and shows opt-in Chrome notifications.
 - Adds Instagram download buttons beside post actions and on accessible profile-grid items.
 - Saves profile pictures, carousel slides, reels, and directly accessible story/highlight media where permitted.
 - Discovers Facebook photos, direct videos, albums, reels, and visible profile/page media.
@@ -152,6 +166,10 @@ The **Accounts** page manages local saved lists. Select profiles across lists, t
 
 The **Export** page reads follower/following rows already visible on a page or parses an official platform data export you choose. Filter, choose fields, then download CSV or JSON locally. Type-to-read is limited to the visible page or the chosen file.
 
+The **Dashboard** page shows active, queued, completed, failed, and cancelled downloads. Completed tiles open the file through Chrome after a user click; files can also be revealed if direct opening is unavailable. Sizes/progress appear only when Chrome provides byte totals.
+
+Settings → Downloads contains the advanced controls: new-media memory, automatic retries, bulk confirmation, notifications, concurrency, history retention, and Reset settings.
+
 Enable **Settings → Downloads → Skip Downloaded** to block media already completed in local history. The popup and in-page toasts distinguish “already downloaded” from unavailable media.
 
 Use **Start select** for checkbox selection, **Select all**, individual toggles, **Clear selection**, and **Download N**. Selection persists per browser tab in `chrome.storage.session`. Settings → Downloads → **Parallel downloads** caps concurrency at 1–3. Queue rows expose pause/resume/cancel/retry where supported and show per-item status plus a failure-count summary.
@@ -180,6 +198,7 @@ src/
   popup/             Platform/page context, actions, selection, queue preview
   options/           Appearance, downloads, site access, UI preview, privacy/data
   sidepanel/         Library and Queue tabs
+  dashboard/         Download dashboard: stats, queue tiles, file actions
   history/           Full download history page
   stories/           Stories & highlights manager page
   accounts/          Saved lists manager + interface preview
@@ -194,7 +213,7 @@ src/
     facebook/                     albums/reels/direct-video guards + post metadata
     tiktok/                       videos/thumbnails/multi-item profile parsing
   downloads/         DownloadService, Chrome client, folder rules, filename builder, output/sidecars, queue
-  storage/           settings/sites/lists + session selection/workflow + IndexedDB history
+  storage/           settings/sites/lists/memory + session selection/workflow + IndexedDB history
   types/             Strict shared contracts, message unions, UI contracts
   utils/             URL, filename, page context, status, formatting, errors, logging
 ```
@@ -314,6 +333,12 @@ Known limits (also shown in-product):
 40. Ghost Mode reduces local traces only. It does not hide story views, DM read receipts, authentication, or identity, and no anonymity is claimed.
 41. Reset everything clears local extension data; files already downloaded remain on disk.
 42. Official relationship export links and platform privacy links are controlled by each platform and may change.
+43. “Download new media only” is a local completed-media fingerprint memory; clearing all data removes it.
+44. Automatic retries reuse the same source and respect the concurrency cap; expired links still require a rescan.
+45. Dashboard totals reflect retained local history and only known Chrome-reported sizes; cleared/pruned history changes totals.
+46. Notifications are opt-in and may expose filenames to anyone who can see the OS/Chrome notification.
+47. “Open file” requires a completed download and a user click; if Chrome cannot open it, MediaVault falls back to showing the folder.
+48. Live platform E2E remains a release gate; the Chrome smoke test covered extension pages and a real localhost download, not authenticated platform pages.
 
 ## Testing and verification
 
@@ -322,13 +347,15 @@ Verified in this repository:
 ```bash
 npm run typecheck   # strict TypeScript, app + configs
 npm run lint        # ESLint, zero warnings/errors
-npm run test:run    # 222 tests passing
+npm run test:run    # 234 tests passing
 npm run build       # loadable dist/ + manifest/package verification
 ```
 
-Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, the download service (pending/downloading/completed/failed/cancelled, browser-confirmed completion, byte progress, pause/resume, cancellation, retry, Save As, duplicates, Skip Downloaded, configurable concurrency, typed history), per-tab selection persistence and bulk UI, queue controls/failure summaries, story/highlight models and expiration, story/highlight manager UI, highlight title folders/covers, saved-list CRUD/import validation/workflow, saved-list UI and confirmation dialogs, visible relationship discovery, official export JSON/CSV parsing, relationship filtering/fields/CSV escaping, relationship page UI, local-only/privacy/permission UI, Ghost Mode copy, folder organization, filename templates/variables/previews, filename sanitization/traversal/length, saved-template settings UI, highest-source video selection, local image-conversion success and fallback, thumbnail/caption/metadata sidecars, actual output reporting, Instagram profile pictures/grid/story targets, in-page overlay injection, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile cards, caption export, filename safety, URL normalization, settings/history/sites storage, typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
+Coverage includes platform/page/account detection, metadata normalization, formats and download options, blob/restricted media, graceful extraction failure, the download service (pending/downloading/completed/failed/cancelled, browser-confirmed completion, byte progress, pause/resume, cancellation, retry, Save As, duplicates, Skip Downloaded, configurable concurrency, typed history), per-tab selection persistence and bulk UI, queue controls/failure summaries, story/highlight models and expiration, story/highlight manager UI, highlight title folders/covers, saved-list CRUD/import validation/workflow, saved-list UI and confirmation dialogs, visible relationship discovery, official export JSON/CSV parsing, relationship filtering/fields/CSV escaping, relationship page UI, local-only/privacy/permission UI, Ghost Mode copy, advanced settings validation/UI, new-media memory, auto-retry, notifications, automatic history clearing, dashboard stats/tiles/actions, bulk confirmation, folder organization, filename templates/variables/previews, filename sanitization/traversal/length, saved-template settings UI, highest-source video selection, local image-conversion success and fallback, thumbnail/caption/metadata sidecars, actual output reporting, Instagram profile pictures/grid/story targets, in-page overlay injection, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile cards, caption export, filename safety, URL normalization, settings/history/sites storage, typed messaging, site permissions, background router dispatch/error boundaries, popup states, demo-mode isolation, mock queue/history/account data, the history page, account cards, and the queue preview.
 
-**Not yet verified here:** live end-to-end downloads against Instagram, Facebook, and TikTok. That requires loading `dist/` in Chrome and testing with real pages you are authorized to access. The manual QA checklist:
+**Verified in real Chrome 157 headless:** via ChromeDriver/WebDriver BiDi, all eight extension pages rendered with zero runtime errors, and one real localhost media URL downloaded through the background service worker and Chrome Downloads API. The test file/history entry were removed afterward.
+
+**Not yet verified here:** real authenticated Instagram, Facebook, and TikTok pages, live bulk cancel/retry interaction, and extension reload persistence. The manual QA checklist:
 
 - Popup renders in light, dark, and system themes.
 - Unsupported page shows the limitation; supported-but-disabled page shows the permission gate.
@@ -359,6 +386,9 @@ Coverage includes platform/page/account detection, metadata normalization, forma
 - Malformed saved-list or relationship imports are rejected before saving; no credentials are stored.
 - Followers/following visible rows and official export files produce filtered CSV/JSON with only selected fields.
 - Privacy status, permission explanations, saved-list clearing, and Ghost Mode links work; no anonymity is claimed.
+- Dashboard renders stats/tiles, opens completed files, retries/cancels, and clears completed entries; sizes/progress match Chrome-reported bytes only.
+- Advanced settings persist and apply: new-media memory, retries, bulk confirmation, notifications, auto-clear history, and Reset settings.
+- Chrome smoke test installed the extension, rendered all pages, and completed one real download through the background service worker.
 - Account selection persists and the popup page-context card reflects the chosen mock account.
 - Full history page shows stats, filters, empty state, and clear confirmation.
 - Side panel switches between Library and Queue; header/footer navigation opens history, stories, accounts, export, and settings.

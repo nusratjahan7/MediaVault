@@ -27,6 +27,10 @@ describe('download folder and filename settings', () => {
 
     expect(await screen.findByText('Downloads')).toBeTruthy();
     expect(screen.getByText(/Path preview/)).toBeTruthy();
+    expect(screen.getByText('Download new media only')).toBeTruthy();
+    expect(screen.getByText('Automatic retries')).toBeTruthy();
+    expect(screen.getByText('Confirm before bulk download')).toBeTruthy();
+    expect(screen.getByText('Show download notifications')).toBeTruthy();
 
     const templateSelect = screen.getByRole('combobox', {
       name: 'Select a filename template',

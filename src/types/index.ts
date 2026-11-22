@@ -1,3 +1,4 @@
+export * from './dashboard';
 export * from './download';
 export * from './history';
 export * from './lists';

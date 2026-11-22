@@ -49,7 +49,12 @@ export const DEFAULT_SETTINGS: Settings = {
   demoMode: false,
   askWhereToSave: false,
   skipDownloaded: false,
+  downloadNewMediaOnly: false,
   downloadConcurrency: DEFAULT_DOWNLOAD_CONCURRENCY,
+  retryCount: 0,
+  confirmBulkDownload: false,
+  showDownloadNotifications: false,
+  autoClearHistoryDays: 0,
   imageFormat: 'original',
   videoQuality: 'highest',
   downloadThumbnails: false,
@@ -102,6 +107,21 @@ function coerceConcurrency(value: unknown): number {
     MAX_DOWNLOAD_CONCURRENCY,
     Math.max(MIN_DOWNLOAD_CONCURRENCY, Math.round(value)),
   );
+}
+
+function coerceRetryCount(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_SETTINGS.retryCount;
+  }
+
+  return Math.min(3, Math.max(0, Math.round(value)));
+}
+
+function coerceAutoClearDays(value: unknown): number {
+  const allowed = new Set([0, 1, 7, 30]);
+  return typeof value === 'number' && allowed.has(value)
+    ? value
+    : DEFAULT_SETTINGS.autoClearHistoryDays;
 }
 
 function coerceImageFormat(value: unknown): ImageFormatPreference {
@@ -209,7 +229,21 @@ export function coerceSettings(value: unknown): Settings {
       value.skipDownloaded,
       DEFAULT_SETTINGS.skipDownloaded,
     ),
+    downloadNewMediaOnly: coerceBoolean(
+      value.downloadNewMediaOnly,
+      DEFAULT_SETTINGS.downloadNewMediaOnly,
+    ),
     downloadConcurrency: coerceConcurrency(value.downloadConcurrency),
+    retryCount: coerceRetryCount(value.retryCount),
+    confirmBulkDownload: coerceBoolean(
+      value.confirmBulkDownload,
+      DEFAULT_SETTINGS.confirmBulkDownload,
+    ),
+    showDownloadNotifications: coerceBoolean(
+      value.showDownloadNotifications,
+      DEFAULT_SETTINGS.showDownloadNotifications,
+    ),
+    autoClearHistoryDays: coerceAutoClearDays(value.autoClearHistoryDays),
     imageFormat: coerceImageFormat(value.imageFormat),
     videoQuality: coerceVideoQuality(value.videoQuality),
     downloadThumbnails: coerceBoolean(

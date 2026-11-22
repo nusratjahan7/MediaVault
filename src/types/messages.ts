@@ -1,3 +1,4 @@
+import type { DashboardSnapshot } from './dashboard';
 import type { HistoryEntry, HistoryPage, HistoryQuery } from './history';
 import type { EnqueueResult } from './download';
 import type { ScanResult } from './media';
@@ -54,6 +55,14 @@ export interface HistoryClearRequest {
   type: 'HISTORY_CLEAR';
 }
 
+export interface DashboardQueryRequest {
+  type: 'DASHBOARD_QUERY';
+}
+
+export interface DashboardClearCompletedRequest {
+  type: 'DASHBOARD_CLEAR_COMPLETED';
+}
+
 export interface SitesStatusRequest {
   type: 'SITES_STATUS';
 }
@@ -79,6 +88,8 @@ export type BackgroundRequest =
   | HistoryQueryRequest
   | HistoryDeleteRequest
   | HistoryClearRequest
+  | DashboardQueryRequest
+  | DashboardClearCompletedRequest
   | SitesStatusRequest
   | SitesRegisterRequest
   | SitesUnregisterRequest;
@@ -93,6 +104,8 @@ export interface BackgroundPayloadMap {
   HISTORY_QUERY: HistoryPage;
   HISTORY_DELETE: { deleted: boolean };
   HISTORY_CLEAR: { cleared: number };
+  DASHBOARD_QUERY: DashboardSnapshot;
+  DASHBOARD_CLEAR_COMPLETED: { cleared: number };
   SITES_STATUS: SiteStatus[];
   SITES_REGISTER: SiteStatus;
   SITES_UNREGISTER: SiteStatus;

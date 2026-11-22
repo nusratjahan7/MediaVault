@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MediaVault",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Save media you're authorized to access from Instagram, Facebook, and TikTok — privately, on your device.",
   "minimum_chrome_version": "116",
   "action": {
@@ -23,7 +23,18 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": ["storage", "downloads", "scripting", "activeTab", "sidePanel"],
+  "permissions": [
+    "storage",
+    "downloads",
+    "downloads.open",
+    "notifications",
+    "scripting",
+    "activeTab",
+    "sidePanel"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
   "optional_host_permissions": [
     "https://*.instagram.com/*",
     "https://*.facebook.com/*",

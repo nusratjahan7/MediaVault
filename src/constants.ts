@@ -1,7 +1,7 @@
 import type { PlatformId, PlatformMeta } from '@/types/platform';
 
 export const APP_NAME = 'MediaVault';
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '1.0.0';
 
 export const DB_NAME = 'mediavault';
 export const DB_VERSION = 1;
@@ -11,6 +11,7 @@ export const SETTINGS_STORAGE_KEY = 'mediavault:settings:v1';
 export const SITES_STORAGE_KEY = 'mediavault:sites:v1';
 export const PREVIEW_ACCOUNTS_STORAGE_KEY = 'mediavault:preview:accounts:v1';
 export const SAVED_LISTS_STORAGE_KEY = 'mediavault:saved-lists:v1';
+export const DOWNLOAD_MEMORY_STORAGE_KEY = 'mediavault:download-memory:v1';
 export const PROFILE_WORKFLOW_SESSION_KEY = 'mediavault:profile-workflow:v1';
 export const MAX_SAVED_LISTS = 50;
 export const MAX_SAVED_PROFILES_PER_LIST = 500;

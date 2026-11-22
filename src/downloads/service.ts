@@ -6,6 +6,7 @@ import {
 import { broadcastEvent } from '@/services/messaging';
 import {
   addHistoryEntry,
+  clearHistoryOlderThan,
   findHistoryByDownloadId,
   getActiveHistoryEntries,
   getHistoryEntry,
@@ -14,6 +15,10 @@ import {
   queryHistory,
   updateHistoryEntry,
 } from '@/storage/history';
+import {
+  hasDownloadedFingerprint,
+  markDownloadedFingerprint,
+} from '@/storage/download-memory';
 import { getSettings } from '@/storage/settings';
 import type {
   DownloadOutputInfo,
@@ -284,6 +289,16 @@ export class DownloadService {
         throw new AppError(
           'ALREADY_DOWNLOADED',
           'This media is already in your download history.',
+        );
+      }
+    }
+
+    if (settings.downloadNewMediaOnly && !source.sidecar) {
+      const remembered = await hasDownloadedFingerprint(source);
+      if (remembered) {
+        throw new AppError(
+          'ALREADY_DOWNLOADED',
+          'Download new media only is on and this media was already downloaded.',
         );
       }
     }
@@ -604,9 +619,11 @@ export class DownloadService {
   async init(): Promise<void> {
     this.ensureListener();
 
-    this.initPromise ??= this.reconcileActiveDownloads().catch((error: unknown) => {
-      logger.warn('Failed to reconcile downloads.', getErrorMessage(error));
-    });
+    this.initPromise ??= this.reconcileActiveDownloads()
+      .catch((error: unknown) => {
+        logger.warn('Failed to reconcile downloads.', getErrorMessage(error));
+      })
+      .then(() => this.pruneIfNeeded());
 
     return this.initPromise;
   }
@@ -761,11 +778,75 @@ export class DownloadService {
       job.error = undefined;
     }
 
+    if (state === 'failed' && !this.cancelRequested.has(job.id)) {
+      const settings = await getSettings();
+      if (job.attempts < settings.retryCount) {
+        if (job.downloadId !== undefined) {
+          this.downloadIdToJob.delete(job.downloadId);
+        }
+
+        job.state = 'pending';
+        job.downloadId = undefined;
+        job.bytesReceived = undefined;
+        job.totalBytes = undefined;
+        job.progress = undefined;
+        job.paused = false;
+        job.error = undefined;
+        job.attempts += 1;
+        job.updatedAt = Date.now();
+        this.pending.push(job);
+
+        await this.persist(job, true);
+        this.broadcast(job);
+        this.resolveWaiter(job.id);
+        this.pump();
+        return;
+      }
+    }
+
+    if (state === 'completed' && !job.source.sidecar) {
+      try {
+        await markDownloadedFingerprint(job.source);
+      } catch (error) {
+        logger.warn('Could not remember the downloaded media id.', getErrorMessage(error));
+      }
+    }
+
     await this.persist(job, true);
     this.broadcast(job);
+    await this.notify(job, state);
     this.resolveWaiter(job.id);
     this.stopPollIfIdle();
     this.trimSessionHistory();
+  }
+
+  private async notify(
+    job: InternalJob,
+    state: Extract<DownloadState, 'completed' | 'failed' | 'cancelled'>,
+  ): Promise<void> {
+    if (job.source.sidecar || (state !== 'completed' && state !== 'failed')) {
+      return;
+    }
+
+    try {
+      const settings = await getSettings();
+      if (!settings.showDownloadNotifications || !chrome.notifications) {
+        return;
+      }
+
+      const filename = job.filename.split('/').pop() ?? job.filename;
+      await chrome.notifications.create(`mediavault:${job.id}`, {
+        type: 'basic',
+        iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+        title: state === 'completed' ? 'MediaVault saved a file' : 'MediaVault download failed',
+        message:
+          state === 'completed'
+            ? filename
+            : `${filename} — ${job.error ?? 'Chrome could not complete the download.'}`,
+      });
+    } catch (error) {
+      logger.warn('Could not show a download notification.', getErrorMessage(error));
+    }
   }
 
   private async handleDelta(delta: chrome.downloads.DownloadDelta): Promise<void> {
@@ -1084,6 +1165,9 @@ export class DownloadService {
       const settings = await getSettings();
       if (settings.historyEnabled) {
         await pruneHistory(settings.maxHistoryEntries);
+        if (settings.autoClearHistoryDays > 0) {
+          await clearHistoryOlderThan(settings.autoClearHistoryDays);
+        }
       }
     } catch (error) {
       logger.warn('Failed to prune download history.', getErrorMessage(error));

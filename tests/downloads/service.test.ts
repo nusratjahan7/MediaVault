@@ -12,6 +12,11 @@ import {
   setDownloadProgress,
 } from '../mocks/chrome';
 
+async function sendHistoryClear(): Promise<void> {
+  const { clearHistory } = await import('@/storage/history');
+  await clearHistory();
+}
+
 const SOURCE: DownloadSource = {
   id: 'instagram_abc12345',
   platform: 'instagram',
@@ -134,6 +139,59 @@ describe('DownloadService', () => {
     expect(record.filename.endsWith('.jpg')).toBe(true);
     expect(record.output?.converted).toBe(false);
     expect(record.output?.note).toMatch(/media processing access/i);
+  });
+
+  it('automatically retries failed downloads up to the configured count', async () => {
+    await saveSettings({ retryCount: 1 });
+    const record = await service.enqueue(SOURCE);
+    service.start(record.id);
+
+    const firstId = await waitFor(() => getLastDownloadId());
+    failDownload(firstId, 'NETWORK_FAILED');
+
+    const secondId = await waitFor(() => {
+      const ids = getDownloadIds();
+      return ids.length > 1 ? ids.at(-1) : undefined;
+    });
+
+    failDownload(secondId!, 'NETWORK_FAILED');
+    const failed = await waitForState(record.id, 'failed');
+
+    expect(failed.attempts).toBe(1);
+    expect(failed.error).toBeDefined();
+    expect(getDownloadIds()).toHaveLength(2);
+  });
+
+  it('shows a Chrome notification for terminal downloads when enabled', async () => {
+    await saveSettings({ showDownloadNotifications: true });
+    const record = await service.enqueue(SOURCE);
+    service.start(record.id);
+    const downloadId = await waitFor(() => getLastDownloadId());
+    completeDownload(downloadId);
+    await waitForState(record.id, 'completed');
+
+    expect(chromeMock.notifications.create).toHaveBeenCalledWith(
+      expect.stringContaining(record.id),
+      expect.objectContaining({
+        type: 'basic',
+        title: expect.stringContaining('saved'),
+      }),
+    );
+  });
+
+  it('skips media remembered by Download new media only even after history clears', async () => {
+    const first = await service.enqueue(SOURCE);
+    service.start(first.id);
+    const downloadId = await waitFor(() => getLastDownloadId());
+    completeDownload(downloadId);
+    await waitForState(first.id, 'completed');
+
+    await saveSettings({ downloadNewMediaOnly: true });
+    await sendHistoryClear();
+
+    await expect(service.enqueue(SOURCE)).rejects.toMatchObject({
+      code: 'ALREADY_DOWNLOADED',
+    });
   });
 
   it('completes only after Chrome confirms the download', async () => {

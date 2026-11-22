@@ -1,6 +1,7 @@
 import { cn } from '@/utils/cn';
 
 export type PageNavId =
+  | 'dashboard'
   | 'history'
   | 'accounts'
   | 'relationships'
@@ -8,6 +9,7 @@ export type PageNavId =
   | 'settings';
 
 const ITEMS: Array<{ id: PageNavId; label: string; href: string }> = [
+  { id: 'dashboard', label: 'Dashboard', href: 'dashboard.html' },
   { id: 'history', label: 'History', href: 'history.html' },
   { id: 'stories', label: 'Stories', href: 'stories.html' },
   { id: 'accounts', label: 'Accounts', href: 'accounts.html' },

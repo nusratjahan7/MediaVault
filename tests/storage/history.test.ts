@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   addHistoryEntry,
+  clearCompletedHistory,
   clearHistory,
+  clearHistoryOlderThan,
   countHistoryByStatus,
+  getDashboardSnapshot,
   deleteHistoryEntry,
   findHistoryByDownloadId,
   getActiveHistoryEntries,
@@ -149,6 +152,73 @@ describe('history storage', () => {
 
     await expect(clearHistory()).resolves.toBe(2);
     await expect(queryHistory()).resolves.toMatchObject({ total: 0, entries: [] });
+  });
+
+  it('builds dashboard counts and only sums known completed sizes', async () => {
+    await addHistoryEntry(
+      makeEntry({
+        id: 'done',
+        status: 'completed',
+        totalBytes: 1_000,
+        updatedAt: 1,
+      }),
+    );
+    await addHistoryEntry(
+      makeEntry({
+        id: 'done-unknown',
+        status: 'completed',
+        updatedAt: 2,
+      }),
+    );
+    await addHistoryEntry(
+      makeEntry({ id: 'failed', status: 'failed', updatedAt: 3 }),
+    );
+    await addHistoryEntry(
+      makeEntry({ id: 'active', status: 'downloading', updatedAt: 4 }),
+    );
+
+    const snapshot = await getDashboardSnapshot();
+    expect(snapshot.counts).toMatchObject({
+      completed: 2,
+      failed: 1,
+      downloading: 1,
+    });
+    expect(snapshot.completedFiles).toBe(2);
+    expect(snapshot.completedBytes).toBe(1_000);
+    expect(snapshot.completedWithBytes).toBe(1);
+    expect(snapshot.entries[0]?.id).toBe('active');
+  });
+
+  it('clears completed entries and old terminal history', async () => {
+    const now = 1_700_000_000_000;
+    await addHistoryEntry(
+      makeEntry({
+        id: 'old-done',
+        status: 'completed',
+        updatedAt: now - 10 * 24 * 60 * 60 * 1000,
+      }),
+    );
+    await addHistoryEntry(
+      makeEntry({
+        id: 'new-done',
+        status: 'completed',
+        updatedAt: now,
+      }),
+    );
+    await addHistoryEntry(
+      makeEntry({
+        id: 'old-active',
+        status: 'downloading',
+        updatedAt: now - 10 * 24 * 60 * 60 * 1000,
+      }),
+    );
+
+    await expect(clearHistoryOlderThan(7, now)).resolves.toBe(1);
+    await expect(getHistoryEntry('old-done')).resolves.toBeUndefined();
+    await expect(getHistoryEntry('new-done')).resolves.toBeTruthy();
+    await expect(getHistoryEntry('old-active')).resolves.toBeTruthy();
+    await expect(clearCompletedHistory()).resolves.toBe(1);
+    await expect(getHistoryEntry('new-done')).resolves.toBeUndefined();
   });
 
   it('prunes the oldest entries', async () => {

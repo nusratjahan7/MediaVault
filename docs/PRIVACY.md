@@ -9,7 +9,9 @@ MediaVault has no backend, cloud sync, analytics, telemetry, remote account, or 
 - **Save download history** can be turned off; existing history remains until cleared.
 - **Clear history** removes IndexedDB history entries after confirmation.
 - **Clear saved lists** removes local lists and the active profile workflow after confirmation.
-- **Reset everything** clears history, lists, workflow, session selections, preview selections, and settings. Downloaded files remain on disk.
+- **Automatic history clearing** can remove terminal entries after 1/7/30 days, on the next download or startup; the UI also applies it immediately when selected.
+- **Reset settings** restores preferences only.
+- **Reset everything** clears history, lists, download-memory fingerprints, workflow, session selections, preview selections, and settings. Downloaded files remain on disk.
 
 ## Permission overview
 

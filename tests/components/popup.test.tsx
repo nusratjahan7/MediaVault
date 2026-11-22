@@ -135,6 +135,76 @@ describe('popup', () => {
     );
   });
 
+  it('asks for confirmation before a bulk download when enabled', async () => {
+    await saveSettings({ confirmBulkDownload: true });
+    const user = userEvent.setup();
+    const second = {
+      ...SCAN_RESULT.items[0]!,
+      id: 'instagram_def67890',
+      url: 'https://scontent.cdninstagram.com/v/photo2.jpg',
+      thumbnailUrl: 'https://scontent.cdninstagram.com/v/photo2.jpg',
+    };
+
+    respondToBackground((request) => {
+      switch (request.type) {
+        case 'SITES_STATUS':
+          return { ok: true, data: SITE_STATUS };
+        case 'SCAN_TAB':
+          return {
+            ok: true,
+            data: { ...SCAN_RESULT, items: [...SCAN_RESULT.items, second] },
+          };
+        case 'HISTORY_QUERY':
+          return { ok: true, data: { entries: [], total: 0, hasMore: false } };
+        case 'DOWNLOAD_ITEMS':
+          return {
+            ok: true,
+            data: {
+              accepted: [
+                {
+                  id: 'job-1',
+                  itemId: SCAN_RESULT.items[0]!.id,
+                  filename: 'photo.jpg',
+                  status: 'queued',
+                },
+                {
+                  id: 'job-2',
+                  itemId: second.id,
+                  filename: 'photo2.jpg',
+                  status: 'queued',
+                },
+              ],
+              skipped: 0,
+              alreadyDownloaded: 0,
+            },
+          };
+        default:
+          return undefined;
+      }
+    });
+
+    renderPopup();
+    expect(await screen.findByText('2 items found')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Bulk download' }));
+    expect(await screen.findByText('Queue 2 downloads?')).toBeTruthy();
+    expect(
+      chromeMock.runtime.sendMessage.mock.calls.some(
+        ([message]) => (message as { type?: string }).type === 'DOWNLOAD_ITEMS',
+      ),
+    ).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: 'Queue 2 downloads' }));
+
+    await vi.waitFor(() => {
+      expect(
+        chromeMock.runtime.sendMessage.mock.calls.some(
+          ([message]) => (message as { type?: string }).type === 'DOWNLOAD_ITEMS',
+        ),
+      ).toBe(true);
+    });
+  });
+
   it('shows the caption export action for Facebook pages', async () => {
     setActiveTabUrl('https://www.facebook.com/photo/?fbid=123');
     respondToBackground((request) => {

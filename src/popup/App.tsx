@@ -7,6 +7,7 @@ import type { MediaFilter } from '@/components/media/MediaFilters';
 import { QueuePreview } from '@/components/queue/QueuePreview';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { PLATFORM_IDS, PLATFORM_META } from '@/constants';
 import { useActiveTab } from '@/hooks/useActiveTab';
@@ -41,6 +42,7 @@ export function App() {
   const [demoPlatform, setDemoPlatform] = useState<PlatformId>('instagram');
   const [filter, setFilter] = useState<MediaFilter>('all');
   const [selectionMode, setSelectionMode] = useState(false);
+  const [pendingBulk, setPendingBulk] = useState<MediaItem[] | null>(null);
 
   const { tab, url, loading: tabLoading } = useActiveTab();
   const liveAdapter = useMemo(() => (url ? getAdapterForUrl(url) : undefined), [url]);
@@ -297,6 +299,22 @@ export function App() {
     [addMockMedia, clearSelection, demo, enqueueLive, toast],
   );
 
+  const requestQueue = useCallback(
+    (target: MediaItem[]) => {
+      if (target.length === 0) {
+        return;
+      }
+
+      if (settings.confirmBulkDownload && target.length > 1) {
+        setPendingBulk(target);
+        return;
+      }
+
+      void queueMedia(target);
+    },
+    [queueMedia, settings.confirmBulkDownload],
+  );
+
   const toggleSelectionMode = () => {
     if (selectionMode) {
       clearSelection();
@@ -493,10 +511,10 @@ export function App() {
             }
           }}
           onBulkDownload={() => {
-            void queueMedia(downloadableItems);
+            requestQueue(downloadableItems);
           }}
           onDownload={() => {
-            void queueMedia(selection.selectedItems);
+            requestQueue(selection.selectedItems);
           }}
           onOpenLibrary={() => {
             void openLibrary();
@@ -529,6 +547,37 @@ export function App() {
         <ShieldCheck className="size-3 text-success" aria-hidden="true" />
         {demo ? 'Demo data · nothing is downloaded or uploaded' : 'Local only. Nothing is uploaded.'}
       </footer>
+
+      <Modal
+        open={pendingBulk !== null}
+        onClose={() => setPendingBulk(null)}
+        title={`Queue ${pendingBulk?.length ?? 0} downloads?`}
+        description="This will add multiple items to the download queue. You can cancel individual items from the library or dashboard."
+        footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setPendingBulk(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                const target = pendingBulk;
+                setPendingBulk(null);
+                if (target) {
+                  void queueMedia(target);
+                }
+              }}
+            >
+              Queue {pendingBulk?.length ?? 0} downloads
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[11px] leading-relaxed text-muted">
+          Bulk confirmation is enabled in Settings → Downloads. Turn it off to queue multiple
+          downloads without this prompt.
+        </p>
+      </Modal>
     </div>
   );
 }

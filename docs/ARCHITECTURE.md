@@ -30,6 +30,14 @@ Module 15 (Account Relationship Export) is complete: visible followers/following
 
 Module 16 (Privacy & Ghost Mode) is complete: enforced local-only status, saved-list/history/all-data clearing, permission overview, and an honest Ghost Mode section with no anonymity workaround.
 
+Module 18 (Advanced Download Settings) is complete with validated new-media memory, auto-retry, bulk confirmation, notifications, automatic history clearing, and full settings UI.
+
+Module 19 (Download Dashboard) is complete with local snapshot aggregation, queue tiles, byte-only progress, known sizes, retry/cancel/open, and completed-entry clearing.
+
+Module 20 (Security & Privacy Audit) is complete with an explicit CSP, permission allowlist, payload validation, import validation, sanitization, and `docs/SECURITY_AUDIT.md`.
+
+Module 21 (Production Release) is prepared as 1.0.0 with production build, ZIP, docs, and a real-Chrome smoke test.
+
 ## 2. Runtime topology
 
 ```
@@ -87,6 +95,7 @@ Module 16 (Privacy & Ghost Mode) is complete: enforced local-only status, saved-
 | `src/popup/` | Page/account context, permission gate, actions, selection mode, queue preview, scan results |
 | `src/options/` | Settings sections, UI preview mode, local data controls |
 | `src/sidepanel/` | Library and Queue views with history/stories/account/settings links |
+| `src/dashboard/` | Download dashboard with aggregate stats and queue tiles |
 | `src/history/` | Full history page with stats, filters, pagination, and actions |
 | `src/stories/` | Stories & highlights manager page |
 | `src/accounts/` | Saved-lists manager plus preserved interface-preview account picker |
@@ -97,7 +106,7 @@ Module 16 (Privacy & Ghost Mode) is complete: enforced local-only status, saved-
 | `src/services/` | Messaging, permissions, tabs, scan orchestration, centralized error boundary, page navigation |
 | `src/adapters/` | Platform URL matching/extraction + shared DOM helpers |
 | `src/downloads/` | `DownloadService` engine, Chrome Downloads client, folder rules, filename/output resolution, sidecars, queue facade |
-| `src/storage/` | Settings/sites/lists in `chrome.storage.local`; workflow/selection in session; history in IndexedDB |
+| `src/storage/` | Settings/sites/lists/download-memory in `chrome.storage.local`; workflow/selection in session; history in IndexedDB |
 | `src/types/` | Strict contracts, messages, saved lists, relationship entries, UI contracts |
 | `src/utils/` | URL, filename/templates, format labels, profile validation, relationship CSV/JSON, files, ID, errors |
 | `src/services/image-conversion.ts` | Local canvas conversion and text data URLs; optional CDN access |
@@ -228,7 +237,9 @@ Error codes: `PERMISSION_DENIED`, `NOT_SUPPORTED`, `TAB_UNAVAILABLE`, `CONTENT_S
 | `scripting` | Foundation | Register/inject the scanner only after opt-in |
 | `activeTab` | Foundation | Identify the tab when the user opens the popup |
 | `sidePanel` | Foundation UI | Library surface (Chrome 116+) |
-| `downloads` | Later module | Save media and track progress (already implemented in this repo) |
+| `downloads` | Download engine | Save media and track progress |
+| `downloads.open` | Dashboard | Open a completed file after a user click |
+| `notifications` | Settings | Optional completion/failure notifications |
 | `optional_host_permissions` | Foundation | Per-platform consent plus media-CDN access for local image conversion, requested at runtime |
 
 Design rules enforced by the manifest and build verifier:
@@ -242,10 +253,10 @@ Design rules enforced by the manifest and build verifier:
 
 Two plain Vite builds produce one loadable folder:
 
-1. **Page build** (`vite.config.ts`) — `popup.html`, `options.html`, `sidepanel.html`, `history.html`, `accounts.html`, `stories.html`, `relationships.html`, and `src/background/index.ts` as an ESM service worker with a fixed `background.js` name. HTML/asset chunks are hashed under `assets/`.
+1. **Page build** (`vite.config.ts`) — `popup.html`, `options.html`, `sidepanel.html`, `dashboard.html`, `history.html`, `accounts.html`, `stories.html`, `relationships.html`, and `src/background/index.ts` as an ESM service worker with a fixed `background.js` name. HTML/asset chunks are hashed under `assets/`.
 2. **Content build** (`vite.content.config.ts`) — `src/content/index.ts` bundled to a single IIFE at the fixed path `content.js`. A fixed path is required for `chrome.scripting.registerContentScripts`; this is why a generic extension plugin is not used.
 
-`public/manifest.json` and `public/icons/*` are copied verbatim; the seven HTML entry pages are emitted with hashed asset references by Vite.
+`public/manifest.json` and `public/icons/*` are copied verbatim; the eight HTML entry pages are emitted with hashed asset references by Vite.
 
 **Scripts**
 
@@ -345,10 +356,12 @@ npm run build
 
 - Strict TypeScript across `src/` and build configs.
 - ESLint 9 with React hooks rules.
-- Vitest: platform/page/account detection, metadata parsing, formats/options, blob and login-wall restrictions, graceful extraction failure, story/highlight models, expiration and title folders, the stories manager page, saved-list CRUD/import validation/workflow/UI, visible relationship discovery, official export JSON/CSV parsing, relationship filtering/fields/page UI, privacy status/permission UI/Ghost Mode, folder organization, filename variables/templates/sanitization/traversal, saved-template UI, highest-source selection, local image conversion/fallback, sidecars, output reporting, Instagram profile pictures/grid/story discovery, Facebook albums/reels/embedded video/direct-video guards, TikTok thumbnails/multi-video profiles/profile-card links and bulk selection, per-tab selection persistence and concurrency limits, in-page action placement and click handling, caption export, Skip Downloaded, download service states/progress/pause/cancel/retry/Save As/duplicates, queue controls and failure summary, storage, messaging, permissions, background router, popup states, demo isolation, mock queue/history/accounts, history page, account cards, queue preview.
-- `verify-dist.mjs` checks the built package as Chrome would consume it, including all seven HTML surfaces.
+- Vitest (234 tests): platform/page/account detection, metadata parsing, formats/options, blobs/restrictions, story/highlight and relationship discovery, saved lists/import workflows, advanced settings, new-media memory, automatic retry, notifications, automatic history clearing, dashboard stats/tiles/actions, bulk confirmation, folder/filename rules, image conversion/fallback, sidecars, output reporting, download service lifecycle/retry/cancel/Save As/duplicates, queue controls, storage, messages/payload validation, permissions, router, popup, privacy UI, demo isolation, history, accounts, and previews.
+- Real Chrome 157 headless smoke via ChromeDriver/WebDriver BiDi: extension installed, all eight pages rendered with zero runtime errors, and one localhost download completed through the background service worker and Chrome Downloads API.
+- `verify-dist.mjs` checks the built package as Chrome would consume it, including all eight HTML surfaces.
+- `security-audit.mjs` checks permission allowlists, self-only CSP, optional origins, no static content scripts, and risky-source patterns.
 
-Live Chrome E2E against real social pages has **not** been run in this environment. The manual QA matrix is in the README.
+Live authenticated Chrome E2E against real social pages has **not** been run in this environment. The manual QA matrix is in the README.
 
 ## 15. Privacy boundaries
 

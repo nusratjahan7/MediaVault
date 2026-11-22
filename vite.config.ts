@@ -22,6 +22,7 @@ export default defineConfig({
         popup: `${root}popup.html`,
         options: `${root}options.html`,
         sidepanel: `${root}sidepanel.html`,
+        dashboard: `${root}dashboard.html`,
         history: `${root}history.html`,
         accounts: `${root}accounts.html`,
         stories: `${root}stories.html`,

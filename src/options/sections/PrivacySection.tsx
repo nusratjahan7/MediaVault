@@ -6,6 +6,9 @@ import { PrivacyStatus } from '@/components/settings/PrivacyStatus';
 import { Select } from '@/components/ui/Select';
 import { Toggle } from '@/components/ui/Toggle';
 import { useSettings } from '@/hooks/useSettings';
+import { useToast } from '@/hooks/useToast';
+import { clearHistoryOlderThan } from '@/storage/history';
+import { getErrorMessage } from '@/utils/errors';
 
 const HISTORY_LIMITS = [100, 250, 500, 1000];
 
@@ -18,6 +21,30 @@ const PRIVACY_POINTS = [
 
 export function PrivacySection() {
   const { settings, updateSettings } = useSettings();
+  const { toast } = useToast();
+
+  const updateAutoClear = async (days: number) => {
+    try {
+      await updateSettings({ autoClearHistoryDays: days });
+      if (days > 0) {
+        const removed = await clearHistoryOlderThan(days);
+        toast({
+          title: 'Automatic history clearing updated',
+          description:
+            removed > 0
+              ? `${removed} old ${removed === 1 ? 'entry was' : 'entries were'} removed now.`
+              : 'Older history will be cleared automatically.',
+          variant: 'success',
+        });
+      }
+    } catch (caught) {
+      toast({
+        title: 'Could not update history clearing',
+        description: getErrorMessage(caught),
+        variant: 'error',
+      });
+    }
+  };
 
   return (
     <Section
@@ -66,6 +93,36 @@ export function PrivacySection() {
                 {limit} entries
               </option>
             ))}
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p
+              className="text-xs font-medium text-fg"
+              title="Automatically delete old terminal history entries after a download or on startup."
+            >
+              Clear history automatically
+            </p>
+            <p className="mt-0.5 max-w-[60ch] text-[11px] leading-relaxed text-muted">
+              Deletes completed, failed, cancelled, or interrupted history entries older than
+              the selected age. Active downloads are never deleted. Downloaded files stay on
+              disk.
+            </p>
+          </div>
+          <Select
+            value={String(settings.autoClearHistoryDays)}
+            onChange={(event) => {
+              void updateAutoClear(Number(event.target.value));
+            }}
+            disabled={!settings.historyEnabled}
+            aria-label="Automatically clear history older than"
+            wrapperClassName="w-full sm:w-40"
+          >
+            <option value="0">Never</option>
+            <option value="1">After 1 day</option>
+            <option value="7">After 7 days</option>
+            <option value="30">After 30 days</option>
           </Select>
         </div>
 

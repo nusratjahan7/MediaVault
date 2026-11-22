@@ -65,6 +65,7 @@ describe('privacy settings and Ghost Mode', () => {
     expect(await screen.findByText('Permission overview')).toBeTruthy();
     expect(screen.getByText('storage')).toBeTruthy();
     expect(screen.getByText('downloads')).toBeTruthy();
+    expect(screen.getByText('Clear history automatically')).toBeTruthy();
 
     await user.click(screen.getByRole('button', { name: 'Clear saved lists' }));
     expect(await screen.findByText('Clear saved account lists?')).toBeTruthy();

@@ -34,6 +34,10 @@ export function App() {
     openExtensionPage('options.html');
   };
 
+  const openDashboard = () => {
+    openExtensionPage('dashboard.html');
+  };
+
   const openHistory = () => {
     openExtensionPage('history.html');
   };
@@ -151,7 +155,11 @@ export function App() {
         )}
       </main>
 
-      <footer className="flex items-center justify-center gap-3 border-t border-border bg-surface px-3 py-2 text-[10px] text-muted">
+      <footer className="flex flex-wrap items-center justify-center gap-2 border-t border-border bg-surface px-3 py-2 text-[10px] text-muted">
+        <button type="button" onClick={openDashboard} className="hover:text-fg">
+          Dashboard
+        </button>
+        <span aria-hidden="true">·</span>
         <button type="button" onClick={openHistory} className="hover:text-fg">
           History
         </button>

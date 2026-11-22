@@ -1,4 +1,5 @@
 import { DEFAULT_HISTORY_LIMIT } from '@/constants';
+import type { DashboardSnapshot } from '@/types/dashboard';
 import type {
   DownloadStatus,
   HistoryEntry,
@@ -108,6 +109,56 @@ export async function queryHistory(query: HistoryQuery = {}): Promise<HistoryPag
   };
 }
 
+export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
+  const db = await getDb();
+  const all = await db.getAll('history');
+  const counts: DashboardSnapshot['counts'] = {
+    queued: 0,
+    downloading: 0,
+    completed: 0,
+    failed: 0,
+    cancelled: 0,
+    interrupted: 0,
+  };
+  let completedBytes = 0;
+  let completedWithBytes = 0;
+
+  for (const entry of all) {
+    counts[entry.status] += 1;
+
+    if (entry.status === 'completed') {
+      const bytes = entry.totalBytes ?? entry.bytesReceived;
+      if (bytes && bytes > 0) {
+        completedBytes += bytes;
+        completedWithBytes += 1;
+      }
+    }
+  }
+
+  return {
+    entries: all.sort((a, b) => b.updatedAt - a.updatedAt),
+    counts,
+    completedFiles: counts.completed,
+    completedBytes,
+    completedWithBytes,
+  };
+}
+
+export async function clearCompletedHistory(): Promise<number> {
+  const db = await getDb();
+  const all = await db.getAll('history');
+  const completed = all.filter((entry) => entry.status === 'completed');
+
+  if (completed.length === 0) {
+    return 0;
+  }
+
+  const transaction = db.transaction('history', 'readwrite');
+  await Promise.all(completed.map((entry) => transaction.store.delete(entry.id)));
+  await transaction.done;
+  return completed.length;
+}
+
 export async function deleteHistoryEntry(id: string): Promise<boolean> {
   const db = await getDb();
   const existing = await db.get('history', id);
@@ -124,6 +175,37 @@ export async function clearHistory(): Promise<number> {
   const count = await db.count('history');
   await db.clear('history');
   return count;
+}
+
+export async function clearHistoryOlderThan(
+  days: number,
+  now = Date.now(),
+): Promise<number> {
+  if (!Number.isFinite(days) || days <= 0) {
+    return 0;
+  }
+
+  const db = await getDb();
+  const all = await db.getAll('history');
+  const cutoff = now - days * 24 * 60 * 60 * 1000;
+  const terminal = new Set<DownloadStatus>([
+    'completed',
+    'failed',
+    'cancelled',
+    'interrupted',
+  ]);
+  const old = all.filter(
+    (entry) => terminal.has(entry.status) && entry.updatedAt < cutoff,
+  );
+
+  if (old.length === 0) {
+    return 0;
+  }
+
+  const transaction = db.transaction('history', 'readwrite');
+  await Promise.all(old.map((entry) => transaction.store.delete(entry.id)));
+  await transaction.done;
+  return old.length;
 }
 
 export async function pruneHistory(maxEntries: number): Promise<number> {

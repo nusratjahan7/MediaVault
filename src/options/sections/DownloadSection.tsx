@@ -297,6 +297,57 @@ export function DownloadSection() {
           />
         </div>
 
+        <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
+          <div className="min-w-0">
+            <p
+              className="text-xs font-medium text-fg"
+              title="Remember completed media IDs in a separate local ledger and skip them even if download history is cleared."
+            >
+              Download new media only
+            </p>
+            <p className="mt-0.5 max-w-[60ch] text-[11px] leading-relaxed text-muted">
+              Remembers completed media IDs locally and skips them in future scans, even after
+              history is cleared. This is different from Skip Downloaded, which checks the
+              current history.
+            </p>
+          </div>
+          <Toggle
+            checked={settings.downloadNewMediaOnly}
+            onChange={(checked) => {
+              void updateSettings({ downloadNewMediaOnly: checked });
+            }}
+            label="Download new media only"
+          />
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p
+              className="text-xs font-medium text-fg"
+              title="Automatic retry attempts after a failed download, in addition to manual retry."
+            >
+              Automatic retries
+            </p>
+            <p className="mt-0.5 max-w-[60ch] text-[11px] leading-relaxed text-muted">
+              Retry failed downloads automatically up to this count. Retries use the same
+              selected source and still respect the concurrency cap.
+            </p>
+          </div>
+          <Select
+            value={String(settings.retryCount)}
+            onChange={(event) => {
+              void updateSettings({ retryCount: Number(event.target.value) });
+            }}
+            aria-label="Automatic retry count"
+            wrapperClassName="w-full sm:w-32"
+          >
+            <option value="0">No auto-retry</option>
+            <option value="1">1 retry</option>
+            <option value="2">2 retries</option>
+            <option value="3">3 retries</option>
+          </Select>
+        </div>
+
         <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-medium text-fg">Parallel downloads</p>
@@ -317,6 +368,50 @@ export function DownloadSection() {
             <option value="2">2 at a time</option>
             <option value="3">3 at a time</option>
           </Select>
+        </div>
+
+        <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
+          <div className="min-w-0">
+            <p
+              className="text-xs font-medium text-fg"
+              title="Ask before queueing more than one downloaded item."
+            >
+              Confirm before bulk download
+            </p>
+            <p className="mt-0.5 max-w-[60ch] text-[11px] leading-relaxed text-muted">
+              Shows a confirmation dialog before queueing multiple items from bulk or selected
+              downloads. Single-item downloads are not blocked.
+            </p>
+          </div>
+          <Toggle
+            checked={settings.confirmBulkDownload}
+            onChange={(checked) => {
+              void updateSettings({ confirmBulkDownload: checked });
+            }}
+            label="Confirm before bulk download"
+          />
+        </div>
+
+        <div className="flex items-start justify-between gap-4 border-t border-border pt-4">
+          <div className="min-w-0">
+            <p
+              className="text-xs font-medium text-fg"
+              title="Use Chrome notifications for completed or failed main media downloads."
+            >
+              Show download notifications
+            </p>
+            <p className="mt-0.5 max-w-[60ch] text-[11px] leading-relaxed text-muted">
+              Uses Chrome notifications for completed or failed downloads. Notifications stay
+              on this device and are not shown for caption/metadata sidecars.
+            </p>
+          </div>
+          <Toggle
+            checked={settings.showDownloadNotifications}
+            onChange={(checked) => {
+              void updateSettings({ showDownloadNotifications: checked });
+            }}
+            label="Show download notifications"
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

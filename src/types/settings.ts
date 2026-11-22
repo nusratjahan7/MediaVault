@@ -25,7 +25,12 @@ export interface Settings {
   demoMode: boolean;
   askWhereToSave: boolean;
   skipDownloaded: boolean;
+  downloadNewMediaOnly: boolean;
   downloadConcurrency: number;
+  retryCount: number;
+  confirmBulkDownload: boolean;
+  showDownloadNotifications: boolean;
+  autoClearHistoryDays: number;
   imageFormat: ImageFormatPreference;
   videoQuality: VideoQualityPreference;
   downloadThumbnails: boolean;

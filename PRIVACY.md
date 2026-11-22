@@ -14,6 +14,7 @@ MediaVault is designed to work entirely on your device. There is no MediaVault s
 | `chrome.storage.local` (`mediavault:sites:v1`) | Platforms you enabled | Restore site access after a restart |
 | `chrome.storage.local` (`mediavault:preview:accounts:v1`) | Mock preview account IDs only | Remember the UI-preview account per platform |
 | `chrome.storage.local` (`mediavault:saved-lists:v1`) | List names, platforms, usernames, profile URLs, optional display names | Local saved-list management; no credentials |
+| `chrome.storage.local` (`mediavault:download-memory:v1`) | Platform/media-ID fingerprints + timestamps | “Download new media only”; no URLs/captions |
 | `chrome.storage.session` (`mediavault:profile-workflow:v1`) | Selected saved profiles and workflow index | Sequential manual profile workflow; cleared with the browser session |
 | `chrome.storage.session` (`mediavault:selection:v1:<tabId>`) | Selected media metadata per browser tab (up to 200 items) | Restore bulk selection across popup reopen/tabs; cleared with the browser session |
 | IndexedDB `mediavault` → `history` | Filename, platform, status, media URL, thumbnail URL, timestamps, optional bytes/total/paused/error | Local download library |
@@ -27,6 +28,8 @@ Nothing in this storage is uploaded anywhere. Only extension pages and the servi
 - **`scripting`** — inject the scanner only after you approve a specific site.
 - **`activeTab`** — determine which tab the popup was opened on.
 - **`sidePanel`** — display the local library.
+- **`notifications`** — optional completion/failure notifications; off by default.
+- **`downloads.open`** — open a completed file from the dashboard after a user click.
 - **Optional host access** — requested per platform when you click "Enable on this site." Only that platform's origin is granted. Revoking it unregisters the scanner.
 
 MediaVault never requests Chrome's `cookies` permission and does not read passwords, form fields, messages, authentication tokens, or account data. Page type and account identity are inferred only from content already rendered on the page you opened; no account or session API is used.

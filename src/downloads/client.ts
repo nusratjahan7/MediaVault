@@ -58,6 +58,19 @@ export async function resumeDownload(downloadId: number): Promise<boolean> {
   }
 }
 
+export async function openDownload(downloadId: number): Promise<boolean> {
+  if (typeof chrome.downloads.open !== 'function') {
+    return false;
+  }
+
+  try {
+    await chrome.downloads.open(downloadId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function showDownload(downloadId: number): Promise<boolean> {
   try {
     await chrome.downloads.show(downloadId);

@@ -100,6 +100,14 @@ The popup also offers **Copy caption & source URL** for Instagram, Facebook, and
 - Failed/cancelled rows expose Retry.
 - A failure count badge and per-item error text summarize problems; the download bar shows overall saved/failed/total progress.
 
+## Dashboard & advanced settings
+
+- Dashboard stats: active, remaining queue, completed files, failed/interrupted, cancelled, and known completed size.
+- Tiles include thumbnail, account, filename, status, failure reason, byte-only progress, retry/cancel, and user-clicked open for completed files.
+- Filters: All / Queue / Completed / Failed / Cancelled; clear completed requires confirmation.
+- Settings → Downloads exposes new-media memory, auto-retries, bulk confirmation, notifications, concurrency, and reset; Privacy & data exposes automatic history clearing and Reset settings.
+- Tooltips/descriptions explain each advanced setting; every control is wired to a working implementation.
+
 ## Accounts, lists & relationship export
 
 - Accounts has **Saved lists** and **Interface preview** views. Saved lists support create/rename/delete, profile add/remove, multi-select, JSON import/export confirmations, and a sequential profile workflow.

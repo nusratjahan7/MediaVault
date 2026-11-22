@@ -4,6 +4,7 @@ import { PREVIEW_ACCOUNTS_STORAGE_KEY } from '@/constants';
 import { useSettings } from '@/hooks/useSettings';
 import { useToast } from '@/hooks/useToast';
 import { sendToBackground } from '@/services/messaging';
+import { clearDownloadMemory } from '@/storage/download-memory';
 import { clearSavedLists, stopProfileWorkflow } from '@/storage/lists';
 import { coerceSettings, DEFAULT_SETTINGS } from '@/storage/settings';
 import { fromErrorPayload, getErrorMessage } from '@/utils/errors';
@@ -11,7 +12,7 @@ import { readFileText } from '@/utils/file';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 
-type ConfirmAction = 'history' | 'lists' | 'all' | null;
+type ConfirmAction = 'history' | 'lists' | 'settings' | 'all' | null;
 
 export function DataManagement() {
   const { settings, updateSettings, resetSettings } = useSettings();
@@ -67,6 +68,28 @@ export function DataManagement() {
     }
   };
 
+  const resetOnlySettings = async () => {
+    setWorking(true);
+
+    try {
+      await resetSettings();
+      toast({
+        title: 'Settings reset',
+        description: 'All preferences were restored to their defaults.',
+        variant: 'success',
+      });
+    } catch (caught) {
+      toast({
+        title: 'Could not reset settings',
+        description: getErrorMessage(caught),
+        variant: 'error',
+      });
+    } finally {
+      setWorking(false);
+      setConfirmAction(null);
+    }
+  };
+
   const clearEverything = async () => {
     setWorking(true);
 
@@ -74,6 +97,7 @@ export function DataManagement() {
       await sendToBackground({ type: 'HISTORY_CLEAR' }).catch(() => undefined);
       await chrome.storage.local.remove(PREVIEW_ACCOUNTS_STORAGE_KEY).catch(() => undefined);
       await clearSavedLists().catch(() => undefined);
+      await clearDownloadMemory().catch(() => undefined);
       await stopProfileWorkflow().catch(() => undefined);
       await chrome.storage.session.clear().catch(() => undefined);
       await resetSettings();
@@ -197,6 +221,14 @@ export function DataManagement() {
             Clear saved lists
           </Button>
           <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setConfirmAction('settings')}
+            icon={<RotateCcw className="size-3.5" aria-hidden="true" />}
+          >
+            Reset settings
+          </Button>
+          <Button
             variant="danger"
             size="sm"
             onClick={() => setConfirmAction('all')}
@@ -236,6 +268,23 @@ export function DataManagement() {
             </Button>
             <Button variant="danger" size="sm" onClick={clearLists} loading={working}>
               Clear saved lists
+            </Button>
+          </>
+        }
+      />
+
+      <Modal
+        open={confirmAction === 'settings'}
+        onClose={() => setConfirmAction(null)}
+        title="Reset settings to defaults?"
+        description="This restores preferences only. History, saved lists, downloads, and site access are not changed."
+        footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmAction(null)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={() => void resetOnlySettings()} loading={working}>
+              Reset settings
             </Button>
           </>
         }
