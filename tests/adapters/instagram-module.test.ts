@@ -115,9 +115,9 @@ describe('Instagram module discovery', () => {
     expect(targets[0]).toMatchObject({
       kind: 'post',
       postUrl: 'https://www.instagram.com/p/FEED123/',
-      position: 'inline',
+      position: 'before',
     });
-    expect(targets[0]?.mount.querySelectorAll('button').length).toBeGreaterThanOrEqual(4);
+    expect(targets[0]?.mount.getAttribute('aria-label')).toBe('Save');
   });
 
   it('does not inject buttons when the page is gated by a login wall', () => {

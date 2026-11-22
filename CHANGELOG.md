@@ -7,6 +7,7 @@
 - Added TikTok current video/story and profile-grid buttons with direct-video/thumbnail fallback.
 - Added direct-video URL validation, embedded Instagram video resolution, manifest/page rejection, and `DOWNLOAD_STATUS` Chrome-confirmed completion feedback.
 - Added duplicate prevention, SPA cleanup, retry/failed states, and scoped media selection.
+- Refined placement to platform-specific action controls: Instagram beside Save, Facebook post beside Share, Facebook Reel before Like, TikTok after Share, and page-specific story/profile/grid edges. Instagram uses an absolute 4px offset to preserve its two-cell action row; controls use platform-matched 34–40px hit targets.
 
 ## 1.0.0 — 2026-11-22
 

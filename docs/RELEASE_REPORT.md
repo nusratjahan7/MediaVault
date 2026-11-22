@@ -23,7 +23,7 @@
 
 - Strict TypeScript.
 - ESLint with zero warnings/errors.
-- 249 tests across 46 files.
+- 250 tests across 46 files.
 - Security audit: manifest allowlist, CSP, optional-origin allowlist, no static content scripts, no eval/new Function/dangerous HTML/cookies.
 - Production pages/content builds and `verify:dist` (15 entry files).
 - Unit/integration coverage includes adapters, formats, download service, browser-confirmed completion, retries, cancellation, notifications, sidecars, folder/filename, settings validation, imports/exports, dashboard, privacy, routers, and UI.
@@ -43,6 +43,8 @@ Verified:
 - files were written under the expected `MediaVault/instagram/...` paths with matching byte counts;
 - test files and history entries were removed afterward.
 - Native platform button behavior was validated with fixture DOM tests, not authenticated live platform pages.
+- Public Instagram post DOM was inspected in Chrome: Save is a nested `role="button"` in a two-cell action row. A 40px probe placed 4px left of the Save wrapper had zero overlap with Like/Comment/Share/Save and did not move the native row.
+- Public Facebook exposed text-only Like/Comment controls but no authenticated Share action; TikTok did not expose a public video action rail without login, so those placements remain fixture-verified.
 
 ### Not tested live
 

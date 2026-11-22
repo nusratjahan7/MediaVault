@@ -45,7 +45,7 @@ afterEach(() => {
 });
 
 describe('native platform buttons', () => {
-  it('places a Facebook post button in the action row and removes it with the media', async () => {
+  it('places a Facebook post button beside Share and removes it with the media', async () => {
     setDocumentHtml(FACEBOOK_POST);
     const url = new URL('https://www.facebook.com/atlasfilms/posts/123');
     const targets = findFacebookActionTargets(document, url);
@@ -54,9 +54,9 @@ describe('native platform buttons', () => {
     expect(targets[0]).toMatchObject({
       platform: 'facebook',
       kind: 'post',
-      position: 'inline',
+      position: 'after',
     });
-    expect(targets[0]?.mount.querySelectorAll('button').length).toBeGreaterThanOrEqual(3);
+    expect(targets[0]?.mount.getAttribute('aria-label')).toBe('Share');
 
     const onDownload = vi.fn(async () => ({ message: 'Saved.', tone: 'success' as const }));
     const controller = startInPageActions({
@@ -85,9 +85,9 @@ describe('native platform buttons', () => {
     expect(targets[0]).toMatchObject({
       platform: 'tiktok',
       kind: 'video',
-      position: 'inline',
+      position: 'after',
     });
-    expect(targets[0]?.mount.querySelectorAll('[data-e2e]').length).toBeGreaterThanOrEqual(3);
+    expect(targets[0]?.mount.getAttribute('data-e2e')).toBe('share-icon');
   });
 
   it('places the Instagram story button on the story edge', () => {
@@ -101,7 +101,7 @@ describe('native platform buttons', () => {
     expect(targets[0]).toMatchObject({
       platform: 'instagram',
       kind: 'story',
-      position: 'overlay-left',
+      position: 'overlay-right',
     });
   });
 
@@ -192,6 +192,11 @@ describe('native platform buttons', () => {
     const reelTargets = findFacebookActionTargets(document, reelUrl);
     const reelScan = scanPage(document, reelUrl);
     expect(reelTargets[0]?.kind).toBe('reel');
+    expect(reelTargets[0]).toMatchObject({
+      position: 'before',
+      mount: expect.any(HTMLElement),
+    });
+    expect(reelTargets[0]?.mount.getAttribute('aria-label')).toBe('Like');
     const reelSelection = selectItemsForTarget(
       reelTargets[0]!,
       reelScan.items,
@@ -241,6 +246,62 @@ describe('native platform buttons', () => {
     expect(storyTarget.position).toBe('overlay-left');
     expect(storySelection).toHaveLength(1);
     expect(storySelection[0]?.kind).toBe('video');
+  });
+
+  it('anchors buttons to the native control for each platform and page type', () => {
+    const onDownload = vi.fn(async () => ({
+      message: 'Saved.',
+      tone: 'success' as const,
+    }));
+
+    setDocumentHtml(feedHtml);
+    const instagramUrl = new URL('https://www.instagram.com/');
+    const instagramController = startInPageActions({
+      findTargets: () => findInstagramActionTargets(document, instagramUrl),
+      onDownload,
+    });
+    instagramController.refresh();
+    const instagramHost = document.querySelector<HTMLElement>('[data-mediavault-action]')!;
+    expect(instagramHost.nextElementSibling?.getAttribute('aria-label')).toBe('Save');
+    instagramController.destroy();
+
+    setDocumentHtml(FACEBOOK_POST);
+    const facebookPostUrl = new URL('https://www.facebook.com/atlasfilms/posts/123');
+    const facebookPostController = startInPageActions({
+      findTargets: () => findFacebookActionTargets(document, facebookPostUrl),
+      onDownload,
+    });
+    facebookPostController.refresh();
+    const facebookPostHost =
+      document.querySelector<HTMLElement>('[data-mediavault-action]')!;
+    expect(facebookPostHost.previousElementSibling?.getAttribute('aria-label')).toBe(
+      'Share',
+    );
+    facebookPostController.destroy();
+
+    const facebookReelUrl = new URL('https://www.facebook.com/reel/998877');
+    const facebookReelController = startInPageActions({
+      findTargets: () => findFacebookActionTargets(document, facebookReelUrl),
+      onDownload,
+    });
+    facebookReelController.refresh();
+    const facebookReelHost =
+      document.querySelector<HTMLElement>('[data-mediavault-action]')!;
+    expect(facebookReelHost.nextElementSibling?.getAttribute('aria-label')).toBe('Like');
+    facebookReelController.destroy();
+
+    setDocumentHtml(TIKTOK_VIDEO);
+    const tiktokUrl = new URL('https://www.tiktok.com/@creator/video/730');
+    const tiktokController = startInPageActions({
+      findTargets: () => findTikTokActionTargets(document, tiktokUrl),
+      onDownload,
+    });
+    tiktokController.refresh();
+    const tiktokHost = document.querySelector<HTMLElement>('[data-mediavault-action]')!;
+    expect(tiktokHost.previousElementSibling?.getAttribute('data-e2e')).toBe(
+      'share-icon',
+    );
+    tiktokController.destroy();
   });
 
   it('marks failed buttons as retryable without alerts', async () => {

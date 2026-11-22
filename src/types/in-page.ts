@@ -14,7 +14,10 @@ export type InPageButtonPosition =
   | 'inline'
   | 'overlay'
   | 'overlay-left'
-  | 'after';
+  | 'overlay-right'
+  | 'beside-left'
+  | 'after'
+  | 'before';
 
 export type InPageSelectionMode = 'all' | 'single' | 'prefer-video';
 

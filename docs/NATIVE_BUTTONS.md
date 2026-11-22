@@ -4,17 +4,21 @@
 
 | Platform / surface | Mount | Behavior |
 | --- | --- | --- |
-| Instagram post/feed | Existing Like/Comment/Share/Save action row | Downloads all rendered carousel media for that post |
-| Instagram Reel/video | Same action row or overlay fallback | Downloads the current Reel/video only |
-| Instagram story/highlight | Story dialog, left edge | Downloads only the currently displayed story media |
+| Instagram post/feed | 40px icon immediately left of the Save wrapper in the native action row | Downloads all rendered carousel media for that post |
+| Instagram Reel/video | Beside Save when present; action row or overlay fallback | Downloads the current Reel/video only |
+| Instagram story/highlight | Story dialog, right edge, vertically centered | Downloads only the currently displayed story media |
 | Instagram profile picture | Immediately after the profile image | Downloads the highest rendered profile image |
 | Instagram profile grid | Top-right of each rendered grid/reel cover | Downloads that specific item |
-| Facebook post | Existing Like/Comment/Share row | Downloads current photo/video; video posts are single-item |
-| Facebook Reel | Existing action row | Downloads the current Reel only |
-| Facebook story | Story dialog, left edge | Downloads only the current story |
+| Facebook post/video | 36px icon immediately after Share | Downloads current photo/video; video posts are single-item |
+| Facebook Reel | 36px icon immediately before Like | Downloads the current Reel only |
+| Facebook story | Story dialog, left edge, vertically centered | Downloads only the current story |
 | Facebook album | Top-right of each linked album photo | Downloads that album image |
-| TikTok video/story | Native Like/Comment/Share action controls | Downloads the current video or story video |
+| TikTok video/story | 34px icon immediately after the Share action | Downloads the current video or story video |
 | TikTok profile grid | Top-right of each video/photo card | Prefers a direct video; otherwise saves the available thumbnail |
+
+Placement is not shared across platforms. Each adapter resolves its own action control and picks the smallest action row that actually contains that control, then mounts relative to the row-level wrapper. This avoids wrapping a third child under Instagram's two-cell action row and avoids anchoring to an entire post container.
+
+Instagram post/reel controls use 40px targets with 24px icons, Facebook post/reel controls use 36px targets with 20px icons, TikTok uses 34px targets with 20px icons, and grid/profile-picture overlays use 28–32px targets. The Instagram post icon is absolutely positioned 4px left of Save, so it does not change the native action-row layout.
 
 Buttons are icon-only with `title="Download"`, use the extension's own neutral styling, isolate CSS in a shadow root, and expose Idle/Detecting/Downloading/Completed/Failed states. Failed buttons become retry buttons. Duplicate hosts are prevented by target id, SPA changes refresh/remove hosts, and disconnected media removes its button.
 
@@ -54,9 +58,13 @@ Unsupported or restricted: blob/adaptive/MSE-only video, HLS/DASH manifests, DRM
 
 - `tests/downloads/media-resolver.test.ts` — page/blob/manifest rejection, CDN acceptance.
 - `tests/adapters/instagram-video.test.ts` — embedded direct versions and page-link rejection.
-- `tests/adapters/platform-buttons.test.ts` — Instagram profile/grid/story/post, Facebook post/reel/album/story, TikTok video/profile-grid placement, scoped selection, duplicate prevention, removal, and failed/retry state.
+- `tests/adapters/platform-buttons.test.ts` — Instagram profile/grid/story/post, Facebook post/reel/album/story, TikTok video/profile-grid placement, control-relative anchoring, scoped selection, duplicate prevention, removal, and failed/retry state.
 - `tests/content/in-page-actions.test.ts` — button injection, title/accessibility, completed state, cleanup.
 - `tests/background/router.test.ts` — `DOWNLOAD_STATUS` validation and response.
 - `tests/downloads/service.test.ts` — page URL rejection.
 
-Live authenticated platform DOM and audio tests have not been run in this environment. Fixture button/selection tests and a real-Chrome page/image/video download smoke test passed; authenticated platform E2E remains required.
+## Live placement check
+
+The public Instagram post DOM was inspected in Chrome. Save is a `role="button"` containing `svg[aria-label="Save"]`; it sits in a separate wrapper in a two-cell action row. The final 40px probe was placed 4px left of that wrapper at the same vertical center, with no overlap against Like, Comment, Share, or Save and without moving the native row. The public Facebook page exposed text-only Like/Comment controls but not the authenticated Share action, and TikTok did not expose a public video action rail without login, so those authenticated placements remain fixture-verified rather than live-verified.
+
+Live authenticated platform downloads and audio tests have not been run in this environment. Fixture button/selection tests and a real-Chrome page/image/video download smoke test passed; authenticated platform E2E remains required. The reference screenshots were not present in the workspace, so spacing follows the platform action controls measured from the live DOM.

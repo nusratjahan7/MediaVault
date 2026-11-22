@@ -21,17 +21,89 @@ function isActionGroup(element: HTMLElement): boolean {
   return actions.length >= 2 && actions.length <= 12 && Boolean(element.querySelector('svg'));
 }
 
-function findActionRow(scope: ParentNode): HTMLElement | undefined {
-  const candidates = [...scope.querySelectorAll<HTMLElement>('section, div')]
-    .filter(isActionGroup);
+function hasActionLabel(element: HTMLElement, pattern: RegExp): boolean {
+  return [...element.querySelectorAll<HTMLElement>('[aria-label]')].some((node) =>
+    pattern.test((node.getAttribute('aria-label') ?? '').trim()),
+  );
+}
 
-  const labeled = candidates.find((element) =>
-    [...element.querySelectorAll<HTMLElement>('[aria-label]')].some((node) =>
-      /like|comment|share|save/i.test(node.getAttribute('aria-label') ?? ''),
-    ),
+function findActionRow(
+  scope: ParentNode,
+  anchor?: HTMLElement,
+): HTMLElement | undefined {
+  const candidates = [...scope.querySelectorAll<HTMLElement>('section, div')]
+    .filter(isActionGroup)
+    .filter((element) => !anchor || element.contains(anchor));
+
+  const labeled = candidates
+    .filter(
+      (element) =>
+        hasActionLabel(element, /^(like|unlike)\b/i) &&
+        (hasActionLabel(element, /^comment\b/i) ||
+          hasActionLabel(element, /^share\b/i) ||
+          hasActionLabel(element, /^(save|saved|remove)$/i)),
+    )
+    .sort(
+      (left, right) =>
+        left.querySelectorAll('*').length - right.querySelectorAll('*').length,
+    );
+
+  return labeled[0] ?? (anchor ? undefined : candidates.at(-1));
+}
+
+function findActionControl(
+  scope: ParentNode,
+  pattern: RegExp,
+): HTMLElement | undefined {
+  const node = [...scope.querySelectorAll<HTMLElement>('[aria-label]')].find((element) =>
+    pattern.test((element.getAttribute('aria-label') ?? '').trim()),
   );
 
-  return labeled ?? candidates.at(-1);
+  if (!node) {
+    return undefined;
+  }
+
+  return (
+    node.closest<HTMLElement>('button, [role="button"], a[role="button"]') ?? node
+  );
+}
+
+function rowLevelMount(
+  control: HTMLElement,
+  actionRow: HTMLElement | undefined,
+): HTMLElement {
+  if (!actionRow || !actionRow.contains(control)) {
+    return control;
+  }
+
+  let mount = control;
+  while (mount.parentElement && mount.parentElement !== actionRow) {
+    mount = mount.parentElement;
+  }
+
+  return mount;
+}
+
+function postPlacement(
+  article: HTMLElement,
+): Pick<InstagramActionTarget, 'mount' | 'position'> {
+  const save = findActionControl(article, /^(save|saved|remove)$/i);
+  const saveRow = save ? findActionRow(article, save) : undefined;
+
+  if (save) {
+    const mount = rowLevelMount(save, saveRow);
+    return mount === save
+      ? { mount, position: 'before' }
+      : { mount, position: 'beside-left' };
+  }
+
+  const actionRow = findActionRow(article);
+
+  if (actionRow) {
+    return { mount: actionRow, position: 'inline' };
+  }
+
+  return { mount: article, position: 'overlay' };
 }
 
 function visibleMediaUrls(scope: ParentNode, base: URL): string[] {
@@ -125,7 +197,7 @@ function storyTarget(document: Document, url: URL): InstagramActionTarget[] {
       kind: 'story',
       mount,
       postUrl: url.toString(),
-      position: 'overlay-left',
+      position: 'overlay-right',
       mediaUrls: visibleMediaUrls(mount, url),
       mediaKindHint: visibleKind(mount),
       selectionMode: 'single',
@@ -199,14 +271,14 @@ export function findInstagramActionTargets(
     }
 
     const postUrl = findPostUrl(article, url);
-    const actionRow = findActionRow(article);
+    const placement = postPlacement(article);
     targets.push({
       id: postUrl ? `post:${postUrl}` : `post:${url.pathname}:${index}`,
       platform: 'instagram',
       kind: 'post',
-      mount: actionRow ?? article,
+      mount: placement.mount,
       postUrl,
-      position: actionRow ? 'inline' : 'overlay',
+      position: placement.position,
       mediaUrls: visibleMediaUrls(article, url),
       mediaKindHint: visibleKind(article),
       selectionMode:
@@ -214,21 +286,24 @@ export function findInstagramActionTargets(
     });
   });
 
-  if (targets.length === 0 && (pageType === 'reel' || pageType === 'video')) {
+  if (
+    targets.length === 0 &&
+    (pageType === 'post' || pageType === 'reel' || pageType === 'video')
+  ) {
     const video = document.querySelector<HTMLVideoElement>('video');
     const scope = video?.closest<HTMLElement>('article, section, main') ?? document.body;
-    const actionRow = findActionRow(scope);
+    const placement = postPlacement(scope);
 
     if (scope.querySelector('video, img')) {
       targets.push({
         id: `post:${url.pathname}`,
         platform: 'instagram',
         kind: 'post',
-        mount: actionRow ?? scope,
+        mount: placement.mount,
         postUrl: url.toString(),
-        position: actionRow ? 'inline' : 'overlay',
+        position: placement.position,
         mediaUrls: visibleMediaUrls(scope, url),
-        mediaKindHint: 'video',
+        mediaKindHint: visibleKind(scope) ?? 'video',
         selectionMode: 'single',
       });
     }

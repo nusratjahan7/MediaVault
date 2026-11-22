@@ -3,6 +3,38 @@ import { normalizeHttpUrl } from '@/utils/url';
 import { detectLoginWall, detectPrivateContent, imageSource } from '../shared/dom';
 import { detectTikTokPageType } from './page-type';
 
+function interactiveControl(node: HTMLElement): HTMLElement {
+  return (
+    node.closest<HTMLElement>('button, [role="button"], a[role="button"]') ?? node
+  );
+}
+
+function findShareControl(document: Document): HTMLElement | undefined {
+  const node =
+    document.querySelector<HTMLElement>('[data-e2e="share-icon"]') ??
+    [...document.querySelectorAll<HTMLElement>('[aria-label]')].find((element) =>
+      /^share\b/i.test((element.getAttribute('aria-label') ?? '').trim()),
+    );
+
+  return node ? interactiveControl(node) : undefined;
+}
+
+function rowLevelMount(
+  control: HTMLElement,
+  actionRow: HTMLElement | undefined,
+): HTMLElement {
+  if (!actionRow || !actionRow.contains(control)) {
+    return control;
+  }
+
+  let mount = control;
+  while (mount.parentElement && mount.parentElement !== actionRow) {
+    mount = mount.parentElement;
+  }
+
+  return mount;
+}
+
 function findActionRow(document: Document): HTMLElement | undefined {
   const anchors = [
     '[data-e2e="like-icon"]',
@@ -133,15 +165,16 @@ export function findTikTokActionTargets(
   }
 
   const actionRow = findActionRow(document);
+  const share = findShareControl(document);
 
   return [
     {
       id: `tiktok-current:${url.pathname}`,
       platform: 'tiktok',
       kind: pageType === 'story' ? 'story' : 'video',
-      mount: actionRow ?? scope,
+      mount: share ? rowLevelMount(share, actionRow) : (actionRow ?? scope),
       postUrl: url.toString(),
-      position: actionRow ? 'inline' : 'overlay',
+      position: share ? 'after' : actionRow ? 'inline' : 'overlay',
       mediaUrls: visibleMediaUrls(scope, url),
       mediaKindHint: visibleKind(scope),
       selectionMode: 'single',

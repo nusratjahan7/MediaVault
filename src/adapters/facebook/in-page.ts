@@ -31,8 +31,92 @@ function isActionGroup(element: HTMLElement): boolean {
   return actions.length >= 2 && actions.length <= 16 && /like|comment|share/i.test(labels);
 }
 
+function hasActionLabel(element: HTMLElement, pattern: RegExp): boolean {
+  return [...element.querySelectorAll<HTMLElement>('[aria-label]')].some((node) =>
+    pattern.test((node.getAttribute('aria-label') ?? '').trim()),
+  );
+}
+
 function findActionRow(scope: ParentNode): HTMLElement | undefined {
-  return [...scope.querySelectorAll<HTMLElement>('div, section')].find(isActionGroup);
+  const candidates = [...scope.querySelectorAll<HTMLElement>('div, section')].filter(
+    isActionGroup,
+  );
+  const labeled = candidates
+    .filter((element) => {
+      const matches = [
+        hasActionLabel(element, /^(like|unlike|remove like)\b/i),
+        hasActionLabel(element, /^comment\b/i),
+        hasActionLabel(element, /^share\b/i),
+      ].filter(Boolean).length;
+      return matches >= 2;
+    })
+    .sort(
+      (left, right) =>
+        left.querySelectorAll('*').length - right.querySelectorAll('*').length,
+    );
+
+  return labeled[0] ?? candidates[0];
+}
+
+function findActionControl(
+  scope: ParentNode,
+  pattern: RegExp,
+): HTMLElement | undefined {
+  const node = [...scope.querySelectorAll<HTMLElement>('[aria-label]')].find((element) =>
+    pattern.test((element.getAttribute('aria-label') ?? '').trim()),
+  );
+
+  if (node) {
+    return (
+      node.closest<HTMLElement>('button, [role="button"], a[role="button"]') ?? node
+    );
+  }
+
+  return [...scope.querySelectorAll<HTMLElement>('button, [role="button"], a[role="button"]')]
+    .filter((element) => (element.textContent ?? '').trim().length <= 40)
+    .find((element) => pattern.test((element.textContent ?? '').trim()));
+}
+
+function rowLevelMount(
+  control: HTMLElement,
+  actionRow: HTMLElement | undefined,
+): HTMLElement {
+  if (!actionRow || !actionRow.contains(control)) {
+    return control;
+  }
+
+  let mount = control;
+  while (mount.parentElement && mount.parentElement !== actionRow) {
+    mount = mount.parentElement;
+  }
+
+  return mount;
+}
+
+function postPlacement(
+  article: HTMLElement,
+  actionRow: HTMLElement | undefined,
+  kind: 'post' | 'video' | 'reel',
+): Pick<InPageActionTarget, 'mount' | 'position'> {
+  const controls = actionRow ?? article;
+  const like = findActionControl(controls, /^(like|unlike|remove like)$/i);
+  const share =
+    findActionControl(controls, /^share$/i) ??
+    findActionControl(controls, /^share\b/i);
+
+  if (kind === 'reel' && like) {
+    return { mount: rowLevelMount(like, actionRow), position: 'before' };
+  }
+
+  if (share) {
+    return { mount: rowLevelMount(share, actionRow), position: 'after' };
+  }
+
+  if (actionRow) {
+    return { mount: actionRow, position: 'inline' };
+  }
+
+  return { mount: article, position: 'overlay' };
 }
 
 function visibleMediaUrls(scope: ParentNode, base: URL): string[] {
@@ -171,13 +255,14 @@ export function findFacebookActionTargets(
           ? 'video'
           : 'post';
 
+    const placement = postPlacement(article, actionRow, kind);
     targets.push({
       id: postUrl ? `facebook-post:${postUrl}` : `facebook-post:${url.pathname}:${index}`,
       platform: 'facebook',
       kind,
-      mount: actionRow ?? article,
+      mount: placement.mount,
       postUrl,
-      position: actionRow ? 'inline' : 'overlay',
+      position: placement.position,
       mediaUrls: visibleMediaUrls(article, url),
       mediaKindHint: visibleKind(article),
       selectionMode:
@@ -190,21 +275,23 @@ export function findFacebookActionTargets(
     (pageType === 'post' || pageType === 'reel' || pageType === 'video')
   ) {
     const media = document.querySelector<HTMLElement>('video, img');
-    const mount = media?.closest<HTMLElement>('[role="article"], main') ?? document.body;
-    const actionRow = findActionRow(mount);
+    const scope = media?.closest<HTMLElement>('[role="article"], main') ?? document.body;
+    const actionRow = findActionRow(scope);
+    const kind = pageType === 'reel' ? 'reel' : pageType === 'video' ? 'video' : 'post';
+    const placement = postPlacement(scope, actionRow, kind);
 
-    if (mount.querySelector('video, img')) {
+    if (scope.querySelector('video, img')) {
       targets.push({
         id: `facebook-page:${url.pathname}`,
         platform: 'facebook',
-        kind: pageType === 'reel' ? 'reel' : pageType === 'video' ? 'video' : 'post',
-        mount: actionRow ?? mount,
+        kind,
+        mount: placement.mount,
         postUrl: url.toString(),
-        position: actionRow ? 'inline' : 'overlay',
-        mediaUrls: visibleMediaUrls(mount, url),
-        mediaKindHint: visibleKind(mount),
+        position: placement.position,
+        mediaUrls: visibleMediaUrls(scope, url),
+        mediaKindHint: visibleKind(scope),
         selectionMode:
-          pageType === 'post' && visibleKind(mount) !== 'video' ? 'all' : 'single',
+          kind === 'post' && visibleKind(scope) !== 'video' ? 'all' : 'single',
       });
     }
   }

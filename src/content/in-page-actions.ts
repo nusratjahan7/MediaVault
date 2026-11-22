@@ -39,8 +39,8 @@ const BUTTON_STYLE = `
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     padding: 0;
     border: 0;
     border-radius: 999px;
@@ -49,6 +49,26 @@ const BUTTON_STYLE = `
     cursor: pointer;
     opacity: 0.9;
     transition: background-color 120ms ease, opacity 120ms ease, transform 120ms ease;
+  }
+  :host([data-mediavault-platform="tiktok"]) button {
+    width: 34px;
+    height: 34px;
+  }
+  :host([data-mediavault-platform="instagram"][data-mediavault-kind="post"]) button,
+  :host([data-mediavault-platform="instagram"][data-mediavault-kind="story"]) button,
+  :host([data-mediavault-platform="facebook"][data-mediavault-kind="story"]) button {
+    width: 40px;
+    height: 40px;
+  }
+  :host([data-mediavault-platform="facebook"][data-mediavault-kind="post"]) button,
+  :host([data-mediavault-platform="facebook"][data-mediavault-kind="video"]) button,
+  :host([data-mediavault-platform="facebook"][data-mediavault-kind="reel"]) button {
+    width: 36px;
+    height: 36px;
+  }
+  :host([data-mediavault-platform="instagram"][data-mediavault-kind="profile-picture"]) button {
+    width: 32px;
+    height: 32px;
   }
   button:hover {
     background: rgba(128, 128, 128, 0.16);
@@ -60,13 +80,30 @@ const BUTTON_STYLE = `
     outline-offset: 2px;
   }
   button:disabled { cursor: progress; opacity: 0.9; }
-  svg { width: 18px; height: 18px; flex: none; }
-  :host(.overlay) button, :host(.overlay-left) button {
+  svg { width: 17px; height: 17px; flex: none; }
+  :host([data-mediavault-platform="tiktok"]) svg { width: 20px; height: 20px; }
+  :host([data-mediavault-platform="instagram"][data-mediavault-kind="post"]) svg,
+  :host([data-mediavault-platform="instagram"][data-mediavault-kind="story"]) svg,
+  :host([data-mediavault-platform="facebook"][data-mediavault-kind="story"]) svg {
+    width: 24px;
+    height: 24px;
+  }
+  :host([data-mediavault-platform="facebook"][data-mediavault-kind="post"]) svg,
+  :host([data-mediavault-platform="facebook"][data-mediavault-kind="video"]) svg,
+  :host([data-mediavault-platform="facebook"][data-mediavault-kind="reel"]) svg {
+    width: 20px;
+    height: 20px;
+  }
+  :host([data-mediavault-platform="instagram"][data-mediavault-kind="profile-picture"]) svg {
+    width: 18px;
+    height: 18px;
+  }
+  :host(.overlay) button, :host(.overlay-left) button, :host(.overlay-right) button {
     color: #fff;
     background: rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(6px);
   }
-  :host(.overlay) button:hover, :host(.overlay-left) button:hover {
+  :host(.overlay) button:hover, :host(.overlay-left) button:hover, :host(.overlay-right) button:hover {
     background: rgba(0, 0, 0, 0.68);
   }
   .spinner {
@@ -151,19 +188,31 @@ function createButtonHost(
   const host = document.createElement('span');
   host.dataset.mediavaultAction = target.id;
   host.dataset.mediavaultPlatform = target.platform;
+  host.dataset.mediavaultKind = target.kind;
   host.dataset.mediavaultState = 'idle';
   host.setAttribute('aria-hidden', 'false');
 
   if (target.position === 'inline') {
     host.style.cssText =
-      'display:inline-flex;align-items:center;justify-content:center;margin-left:4px;vertical-align:middle;';
+      'display:inline-flex;align-items:center;justify-content:center;margin-inline-start:2px;vertical-align:middle;';
   } else if (target.position === 'after') {
     host.style.cssText =
-      'display:inline-flex;align-items:center;justify-content:center;margin-left:6px;vertical-align:middle;';
+      'display:inline-flex;align-items:center;justify-content:center;margin-inline-start:2px;vertical-align:middle;';
+  } else if (target.position === 'before') {
+    host.style.cssText =
+      'display:inline-flex;align-items:center;justify-content:center;margin-inline-end:2px;vertical-align:middle;';
   } else if (target.position === 'overlay-left') {
     ensureRelativePosition(target.mount);
     host.style.cssText =
       'position:absolute;left:10px;top:50%;transform:translateY(-50%);z-index:2147482000;display:block;';
+  } else if (target.position === 'overlay-right') {
+    ensureRelativePosition(target.mount);
+    host.style.cssText =
+      'position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:2147482000;display:block;';
+  } else if (target.position === 'beside-left') {
+    ensureRelativePosition(target.mount);
+    host.style.cssText =
+      'position:absolute;right:calc(100% + 4px);top:50%;transform:translateY(-50%);z-index:2147482000;display:block;';
   } else {
     ensureRelativePosition(target.mount);
     host.style.cssText =
@@ -300,6 +349,10 @@ export function startInPageActions(
       return entry.host.previousElementSibling === target.mount;
     }
 
+    if (target.position === 'before') {
+      return entry.host.nextElementSibling === target.mount;
+    }
+
     return entry.host.parentElement === target.mount;
   };
 
@@ -331,11 +384,17 @@ export function startInPageActions(
 
       if (target.position === 'after') {
         target.mount.insertAdjacentElement('afterend', host);
+      } else if (target.position === 'before') {
+        target.mount.insertAdjacentElement('beforebegin', host);
       } else {
         target.mount.appendChild(host);
       }
 
-      if (target.position === 'overlay' || target.position === 'overlay-left') {
+      if (
+        target.position === 'overlay' ||
+        target.position === 'overlay-left' ||
+        target.position === 'overlay-right'
+      ) {
         host.classList.add(target.position);
       }
 
