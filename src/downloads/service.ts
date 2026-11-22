@@ -33,6 +33,7 @@ import { createId } from '@/utils/id';
 import { logger } from '@/utils/logger';
 import { isHttpUrl } from '@/utils/url';
 import { sanitizeDownloadPath } from '@/utils/filename';
+import { describeSourceType, traceDownloadStage } from '@/utils/download-trace';
 import { isLikelyMediaUrl } from './media-resolver';
 import {
   cancelDownload,
@@ -334,6 +335,17 @@ export class DownloadService {
 
     this.jobs.set(job.id, job);
     this.pending.push(job);
+
+    if (import.meta.env.DEV) {
+      traceDownloadStage({
+        stage: 'enqueue',
+        platform: job.source.platform,
+        mediaType: job.source.kind,
+        sourceType: describeSourceType(job.downloadUrl ?? job.source.url),
+        filename: job.filename,
+        state: job.state,
+      });
+    }
 
     if (job.persist) {
       try {
@@ -689,6 +701,18 @@ export class DownloadService {
       await this.persist(job, true);
       this.broadcast(job);
 
+      if (import.meta.env.DEV) {
+        traceDownloadStage({
+          stage: 'start',
+          platform: job.source.platform,
+          mediaType: job.source.kind,
+          sourceType: describeSourceType(job.downloadUrl ?? job.source.url),
+          filename: job.filename,
+          downloadId,
+          state: job.state,
+        });
+      }
+
       if (this.cancelRequested.has(job.id)) {
         await cancelDownload(downloadId);
         return;
@@ -803,6 +827,21 @@ export class DownloadService {
         this.pump();
         return;
       }
+    }
+
+    if (import.meta.env.DEV) {
+      traceDownloadStage({
+        stage: 'finish',
+        platform: job.source.platform,
+        mediaType: job.source.kind,
+        sourceType: describeSourceType(job.downloadUrl ?? job.source.url),
+        filename: job.filename,
+        downloadId: job.downloadId,
+        state,
+        errorCode: errorCode ?? download?.error ?? undefined,
+        bytesReceived: job.bytesReceived,
+        totalBytes: job.totalBytes,
+      });
     }
 
     if (state === 'completed' && !job.source.sidecar) {

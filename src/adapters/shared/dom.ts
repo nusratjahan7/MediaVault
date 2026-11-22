@@ -19,6 +19,17 @@ const UI_IMAGE_PATTERNS: RegExp[] = [
 
 const UI_ALT_PATTERN = /profile picture|avatar|icon|emoji|logo|badge/i;
 
+const NON_VISIBLE_TEXT_SELECTOR = 'script, style, noscript, template, svg';
+
+const LOGIN_TEXT_PATTERN =
+  /log in to continue|sign up to see|you must log in|log in to see|log in to view/;
+
+const EXPIRED_STORY_TEXT_PATTERN =
+  /story (?:is )?(?:no longer available|unavailable|expired)|this story has expired|highlight (?:is )?no longer available/;
+
+const PRIVATE_CONTENT_TEXT_PATTERN =
+  /this account is private|this post is not available|this content isn't available|sorry, this page isn't available|content isn't available right now/;
+
 export interface ImageCandidate {
   url: string;
   width?: number;
@@ -163,32 +174,122 @@ export function collectVideos(root: ParentNode, base: string | URL): VideoCandid
   return candidates;
 }
 
-export function detectLoginWall(document: Document): boolean {
-  if (document.querySelector('input[type="password"]')) {
+/**
+ * Reads only text the user can actually see. `body.textContent` also includes
+ * `<script>`/`<style>` payloads, and platforms embed i18n dictionaries and
+ * serialized state containing phrases like "this account is private" on every
+ * page. Matching those marked public pages as restricted and blocked every
+ * download, so gate detection on rendered text instead.
+ */
+export function visiblePageText(document: Document): string {
+  const body = document.body;
+  if (!body) {
+    return '';
+  }
+
+  let visible = '';
+
+  if (typeof body.innerText === 'string' && body.innerText.length > 0) {
+    visible = body.innerText;
+  } else {
+    const clone = body.cloneNode(true) as HTMLElement;
+    for (const node of Array.from(clone.querySelectorAll(NON_VISIBLE_TEXT_SELECTOR))) {
+      node.remove();
+    }
+    visible = clone.textContent ?? '';
+  }
+
+  // Script payloads can still leak through some innerText edge cases; strip them.
+  for (const script of Array.from(body.querySelectorAll('script'))) {
+    const text = script.textContent;
+    if (text && text.length > 40) {
+      visible = visible.split(text).join(' ');
+    }
+  }
+
+  return visible.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+export function isElementVisible(element: HTMLElement): boolean {
+  const view = element.ownerDocument.defaultView;
+  let current: HTMLElement | null = element;
+
+  while (current) {
+    if (current.hidden || current.getAttribute('aria-hidden') === 'true') {
+      return false;
+    }
+
+    const inline = current.style;
+    if (
+      inline &&
+      (inline.display === 'none' ||
+        inline.visibility === 'hidden' ||
+        inline.opacity === '0')
+    ) {
+      return false;
+    }
+
+    if (view) {
+      const computed = view.getComputedStyle(current);
+      if (
+        computed.display === 'none' ||
+        computed.visibility === 'hidden'
+      ) {
+        return false;
+      }
+    }
+
+    current = current.parentElement;
+  }
+
+  return true;
+}
+
+export function hasVisiblePasswordField(document: Document): boolean {
+  for (const input of Array.from(document.querySelectorAll('input[type="password"]'))) {
+    if (isElementVisible(input as HTMLElement)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Whether the page actually renders media a user could save. Used to avoid
+ * treating persistent header/sidebar login forms as a blocking wall: platforms
+ * like Facebook render a login form on public pages that still expose media.
+ */
+function hasRenderedMediaContent(document: Document): boolean {
+  if (document.querySelectorAll('video, article, [role="article"]').length > 0) {
     return true;
   }
 
-  const text = (document.body?.textContent ?? '').toLowerCase();
-  const hasContent = document.querySelectorAll('video, article, [role="article"]').length > 0;
+  for (const image of Array.from(document.querySelectorAll('img'))) {
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+    if (width >= MIN_IMAGE_SIZE && height >= MIN_IMAGE_SIZE) {
+      return true;
+    }
+  }
 
-  return (
-    !hasContent &&
-    /log in to continue|sign up to see|you must log in|log in to see|log in to view/.test(text)
-  );
+  return false;
+}
+
+export function detectLoginWall(document: Document): boolean {
+  if (hasRenderedMediaContent(document)) {
+    return false;
+  }
+
+  return hasVisiblePasswordField(document) || LOGIN_TEXT_PATTERN.test(visiblePageText(document));
 }
 
 export function detectExpiredStory(document: Document): boolean {
-  const text = (document.body?.textContent ?? '').toLowerCase();
-  return /story (?:is )?(?:no longer available|unavailable|expired)|this story has expired|highlight (?:is )?no longer available/.test(
-    text,
-  );
+  return EXPIRED_STORY_TEXT_PATTERN.test(visiblePageText(document));
 }
 
 export function detectPrivateContent(document: Document): boolean {
-  const text = (document.body?.textContent ?? '').toLowerCase();
-  return /this account is private|this post is not available|this content isn't available|sorry, this page isn't available|content isn't available right now/.test(
-    text,
-  );
+  return PRIVATE_CONTENT_TEXT_PATTERN.test(visiblePageText(document));
 }
 
 export function createMediaItem(

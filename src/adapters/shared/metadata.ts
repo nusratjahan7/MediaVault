@@ -7,6 +7,7 @@ import type { AccountIdentity, PageType } from '@/types/page';
 import type { PlatformId } from '@/types/platform';
 import { createMediaId } from '@/utils/id';
 import { extensionFromUrl, isHttpUrl, normalizeHttpUrl } from '@/utils/url';
+import { describeSourceType, traceMediaStage } from '@/utils/download-trace';
 import {
   invalidMediaReason,
   isLikelyMediaUrl,
@@ -177,7 +178,7 @@ export function enrichMediaItem(
   const sourcePageUrl =
     item.sourcePageUrl ?? item.postUrl ?? context.url.toString();
 
-  return {
+  const enriched: MediaItem = {
     ...item,
     id: item.id || createMediaId(platform, item.url),
     platform,
@@ -200,6 +201,25 @@ export function enrichMediaItem(
       ? 'restricted'
       : item.downloadStatus ?? (downloadable ? 'available' : 'unsupported'),
   };
+
+  if (import.meta.env.DEV) {
+    traceMediaStage({
+      stage: 'resolve',
+      platform,
+      mediaType: enriched.kind,
+      sourceType: describeSourceType(enriched.url),
+      downloadable: enriched.downloadable,
+      downloadStatus: enriched.downloadStatus,
+      formatCount: enriched.formats?.length ?? 0,
+      reasonCode: blocking
+        ? 'blocking-limitation'
+        : !validDirectUrl
+          ? 'invalid-direct-url'
+          : undefined,
+    });
+  }
+
+  return enriched;
 }
 
 export function buildDownloadOptions(item: MediaItem): DownloadOption[] {

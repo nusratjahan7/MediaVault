@@ -43,6 +43,9 @@ Instagram now reads direct `video_versions` / `playable_url` data already embedd
 3. Click-time logic reused a 2-second cached scan and did not wait for the video source/embedded state, so the button could run before a direct source existed.
 4. Buttons only existed for Instagram, used generic styling, and reported enqueue success rather than waiting for Chrome-confirmed completion.
 5. Facebook embedded video extraction was global on feed surfaces, risking a different post’s video.
+6. **Gating read `<script>` payloads.** `detectPrivateContent`/`detectLoginWall` scanned `document.body.textContent`, which includes serialized page data. TikTok ships its i18n dictionary in `<script>`, and that dictionary contains “this account is private” on *every* page. Every public TikTok page was therefore marked `restricted` with `private-content`, so no media was ever downloadable and no in-page buttons mounted. Detection now reads rendered text only (`visiblePageText`), which excludes `script`/`style`/`noscript`/`template`/`svg`.
+7. **A persistent header login form blocked public content.** Facebook renders a password field on public pages that still expose rendered media, so `detectLoginWall` reported a blocking wall even though the visible photos downloaded fine. Pages that actually render media (a `video`/`article`, or an image at or above `MIN_IMAGE_SIZE`) are no longer treated as login-gated.
+8. **Profile-scoped media URLs were typed `unknown`.** Instagram and Facebook nest media under a profile (`/@user/reel/…`, `/<page>/videos/…`, `/<page>/posts/…`). Those pages fell through to `unknown`, so `isPostPage`/`isVideoPage` was false and video/photo extraction was skipped. Both page-type detectors now match the profile-scoped forms.
 
 ## Completion feedback
 
@@ -58,6 +61,7 @@ Unsupported or restricted: blob/adaptive/MSE-only video, HLS/DASH manifests, DRM
 
 - `tests/downloads/media-resolver.test.ts` — page/blob/manifest rejection, CDN acceptance.
 - `tests/adapters/instagram-video.test.ts` — embedded direct versions and page-link rejection.
+- `tests/adapters/gating-regression.test.ts` — embedded `<script>` phrases no longer block public pages; genuine visible private/login pages still block; a header login form with rendered media does not; profile-scoped Instagram/Facebook media URLs resolve and mount buttons.
 - `tests/adapters/platform-buttons.test.ts` — Instagram profile/grid/story/post, Facebook post/reel/album/story, TikTok video/profile-grid placement, control-relative anchoring, scoped selection, duplicate prevention, removal, and failed/retry state.
 - `tests/content/in-page-actions.test.ts` — button injection, title/accessibility, completed state, cleanup.
 - `tests/background/router.test.ts` — `DOWNLOAD_STATUS` validation and response.

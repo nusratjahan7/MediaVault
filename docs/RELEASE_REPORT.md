@@ -69,7 +69,24 @@ Verified:
 
 ## Known bugs / limitations
 
-No critical defects were found in the automated gate or Chrome smoke test.
+Three real detection defects were found by tracing the pipeline against live pages and fixed; see below. One platform-side download failure remains (TikTok CDN), documented honestly.
+
+Resolved in this pass (verified in real Chrome against live pages):
+
+- Public TikTok pages were marked `restricted` because gating read `<script>` i18n payloads. Fixed; TikTok now resolves the video plus thumbnail as `available`.
+- Public Facebook pages showed a blocking login wall because of a persistent header password field. Fixed; Facebook photos now download with no limitations.
+- Profile-scoped media URLs detected as `unknown`. Fixed for Instagram and Facebook.
+
+Verified live in Chrome (release build):
+
+- Instagram Reel video: completed, valid MP4, H.264 + AAC audio preserved.
+- Instagram image and profile-grid button download: completed, valid JPEG.
+- Facebook photo downloads: completed, valid PNG/JPEG, correct extensions.
+- Instagram in-page buttons mounted on a live profile (13: profile picture + grid) and a button click completed a real download.
+
+Remaining release limitation:
+
+- TikTok video files may still fail with `SERVER_FORBIDDEN` from `chrome.downloads` even though the page exposes a direct MP4 URL and plays it. The same URL 403s for a plain request, for a request from the page context, and for a direct page-anchor click while the page continues to play via a `blob:`/MSE stream. This is TikTok CDN anti-bot behavior keyed on request fingerprint, not the extension; the thumbnail from the same page downloads normally. Downloads may succeed on other networks/sessions, and this path is reported honestly as a failure rather than a false success.
 
 Release limitations:
 

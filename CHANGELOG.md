@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fixed a detection bug where page gating read `<script>` payloads: public TikTok pages carry their i18n dictionary in serialized page data, which contains “this account is private”, so every TikTok page was marked restricted and no media was ever downloadable or offered a button. Gating now reads rendered text only.
+- Fixed a false login wall on public Facebook pages: a persistent header password field blocked content that rendered and downloaded normally. Pages that actually render media are no longer treated as gated.
+- Fixed profile-scoped media URLs (`/@user/reel/…`, `/<page>/videos/…`, `/<page>/posts/…`) detecting as `unknown`, which skipped video/photo extraction and in-page buttons.
+- Added development-only pipeline tracing (`VITE_DOWNLOAD_TRACE=1`) covering platform, media type, source type, filename, Chrome download id, error code, and state, with no cookie/token/caption/account logging and no URL logging. Tracing is compiled out of production builds.
 - Added native icon download buttons for Instagram posts, Reels, stories, profile pictures, and profile grids.
 - Added Facebook post, Reel, story, and album buttons.
 - Added TikTok current video/story and profile-grid buttons with direct-video/thumbnail fallback.

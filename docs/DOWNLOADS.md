@@ -90,6 +90,23 @@ The check uses completed local history only. Disabling the setting, deleting the
 - On service-worker startup, active rows are reconciled against `chrome.downloads.search`; in-progress downloads are reattached to polling, completed rows are finalized, and missing/interrupted downloads become failed with a clear message.
 - `getHistory()` merges in-memory session records with persisted IndexedDB history.
 
+## Debug tracing
+
+`src/utils/download-trace.ts` traces the pipeline in development builds:
+detection (`detect`), per-item resolution (`resolve`), then `enqueue` → `start` →
+`finish`, each with platform, media type, source type, filename, Chrome download
+id, error code, and state. Progress is available from the same record.
+
+Enable it with `VITE_DOWNLOAD_TRACE=1 npm run dev`. It is silent otherwise, and
+every call site is wrapped in `if (import.meta.env.DEV)`, so production builds
+contain no tracing code or event construction (verified: zero trace strings in
+`dist/`).
+
+It never logs cookies, tokens, headers, captions, or account data. URLs are
+never printed — only a coarse `sourceType` (`platform-cdn`, `tiktok-cdn`,
+`direct-http`, `data-url`, `blob`, `invalid-url`) because signed CDN URLs carry
+short-lived credentials.
+
 ## Privacy
 
 The engine talks only to Chrome's Downloads API. It never uploads media, never proxies downloads, and never reads cookies or session tokens. The URL being downloaded is the direct URL already exposed to the page.
@@ -111,3 +128,4 @@ The engine talks only to Chrome's Downloads API. It never uploads media, never p
 - typed history comes from the service;
 - invalid/restricted sources are rejected.
 - `tests/downloads/sidecars.test.ts` covers thumbnail/caption/metadata sidecars.
+- `tests/adapters/gating-regression.test.ts` covers the page-gating fixes: embedded `<script>` phrases must not block a public page, while genuine visible private/login pages still block.

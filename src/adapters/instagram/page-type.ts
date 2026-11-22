@@ -37,15 +37,15 @@ export function detectInstagramPageType(url: URL): PageType {
     return 'tagged';
   }
 
-  if (/^\/p\/[^/]+/.test(path)) {
+  if (/^\/p\/[^/]+/.test(path) || /^\/[^/]+\/p\/[^/]+/.test(path)) {
     return 'post';
   }
 
-  if (/^\/(reel|reels)\/[^/]+/.test(path)) {
+  if (/^\/(reel|reels)\/[^/]+/.test(path) || /^\/[^/]+\/reels?\/[^/]+/.test(path)) {
     return 'reel';
   }
 
-  if (/^\/tv\/[^/]+/.test(path)) {
+  if (/^\/tv\/[^/]+/.test(path) || /^\/[^/]+\/tv\/[^/]+/.test(path)) {
     return 'video';
   }
 

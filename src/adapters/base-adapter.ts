@@ -2,6 +2,7 @@ import type { DownloadOption, MediaItem, ScanLimitation } from '@/types/media';
 import type { AccountIdentity, PageType, PlatformDetection } from '@/types/page';
 import type { PlatformId } from '@/types/platform';
 import { isHttpUrl } from '@/utils/url';
+import { describeSourceType, traceMediaStage } from '@/utils/download-trace';
 import { dedupeMediaItems, detectExpiredStory } from './shared/dom';
 import { buildDownloadOptions, enrichMediaItem } from './shared/metadata';
 import type {
@@ -71,6 +72,21 @@ export abstract class BasePlatformAdapter implements PlatformAdapter {
         )
         .filter((item) => isHttpUrl(item.url)),
     );
+
+    if (import.meta.env.DEV) {
+      traceMediaStage({
+        stage: 'detect',
+        platform: this.id,
+        mediaType: items.some((item) => item.kind === 'video') ? 'video' : 'image',
+        sourceType: items.map((item) => describeSourceType(item.url)).join(','),
+        downloadable: items.some((item) => item.downloadable),
+        downloadStatus: blocking ? 'restricted' : undefined,
+        formatCount: items.length,
+        reasonCode: raw.limitations.find(
+          (limitation) => limitation.severity === 'blocking',
+        )?.code,
+      });
+    }
 
     return {
       platform: this.id,

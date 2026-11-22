@@ -60,23 +60,31 @@ export function detectFacebookPageType(url: URL): PageType {
 
   if (
     /^\/(media\/set|photos\/album|album\.php)(\/|$)/.test(path) ||
+    /^\/[^/]+\/photos\/a\./i.test(path) ||
     sk === 'album'
   ) {
     return 'album';
   }
 
-  if (/^\/reels?\//.test(path) || path.startsWith('/share/r/')) {
+  // Profile-scoped media: /<page>/videos/<id>, /<page>/reels/<id>, /<page>/posts/<id>.
+  if (
+    /^\/reels?\//i.test(path) ||
+    /^\/[^/]+\/reels?\//i.test(path) ||
+    path.startsWith('/share/r/')
+  ) {
     return 'reel';
   }
 
   if (
     /^\/(watch|videos|video\.php)(\/|$)/.test(path) ||
+    /^\/[^/]+\/videos\//i.test(path) ||
     path.startsWith('/share/v/')
   ) {
     return 'video';
   }
 
   if (
+    /^\/[^/]+\/(posts|photos)\//i.test(path) ||
     /^\/(photo|photos|photo\.php|permalink|permalink\.php|posts|story\.php)(\/|$)/.test(
       path,
     )

@@ -8,3 +8,4 @@
 - When a capability (e.g. anonymous viewing or hiding activity) can't be done through a permitted method, mark it explicitly unavailable rather than building a workaround; never promise anonymity or concealment the tool doesn't provide. Confidence: 0.65
 - Wants platform-specific logic isolated per platform (its own adapter module) and kept separate from other platforms and shared/generic code; explicitly rejects one universal/generic behavior applied across platforms (e.g. UI placement must be decided per platform and page type). Confidence: 0.75
 - Before changing DOM selectors or integration points, verify against the real target: inspect the actual live DOM/structure first rather than guessing, and test the change on real supported page layouts. Confidence: 0.6
+- Wants diagnostic logging to be development-only and stripped from production builds, and never to log cookies, auth tokens, private messages, or sensitive account data. Confidence: 0.8
